@@ -74,6 +74,23 @@ export default function ScanPage() {
       .update({ current_stock: newStock })
       .eq('id', product.id);
 
+    // เพิ่มการเช็ก Error ตรงนี้ครับ
+  const { error: txError } = await supabase.from('transactions').insert([{
+    product_id: product.id,
+    type: mode,
+    amount: adjustment,
+    stock_before: product.current_stock,
+    stock_after: newStock,
+    note: note,
+    created_by: userName
+  }]);
+
+  if (txError) {
+    console.error("Transaction Error:", txError); // ดูใน Inspect ของบราวเซอร์
+    alert("เกิดข้อผิดพลาดในการบันทึกประวัติ: " + txError.message);
+    return; // หยุดการทำงานถ้าบันทึกประวัติไม่สำเร็จ
+  }
+
     if (!updateError) {
       await supabase.from('transactions').insert([{
         product_id: product.id,
