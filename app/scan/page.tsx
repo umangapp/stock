@@ -83,38 +83,38 @@ export default function ScanPage() {
     setAdjustment(num);
   };
 
-  const confirmUpdate = async () => {
-    const finalAmount = mode === 'receive' ? adjustment : -adjustment;
-    const newStock = product.current_stock + finalAmount;
+const confirmUpdate = async () => {
+  const finalAmount = mode === 'receive' ? adjustment : -adjustment;
+  const newStock = product.current_stock + finalAmount;
 
-    // 1. บันทึกประวัติการทำรายการ (ใช้ชื่อพนักงานที่ล็อคอินอยู่)
-    const { error: txError } = await supabase.from('transactions').insert([{
-      product_id: product.id,
-      type: mode,
-      amount: adjustment,
-      stock_before: product.current_stock,
-      stock_after: newStock,
-      note: note,
-      created_by: userName
-    }]);
+  // บันทึกประวัติ (ชื่อคอลัมน์ต้องตรงกับใน SQL)
+  const { error: txError } = await supabase.from('transactions').insert([{
+    product_id: product.id,
+    type: mode,
+    amount: adjustment,    // ต้องชื่อ 'amount' ตามที่เราแก้ SQL ด้านบน
+    stock_before: product.current_stock,
+    stock_after: newStock,
+    note: note,
+    created_by: userName   // ชื่อจากระบบ Login
+  }]);
 
-    if (txError) {
-      alert("บันทึกประวัติล้มเหลว: " + txError.message);
-      return;
-    }
+  if (txError) {
+    alert("บันทึกประวัติล้มเหลว: " + txError.message);
+    return;
+  }
 
-    // 2. อัปเดตสต๊อกสินค้า
-    const { error: updateError } = await supabase
-      .from('products')
-      .update({ current_stock: newStock })
-      .eq('id', product.id);
+  // อัปเดตสต๊อกในตาราง products
+  const { error: updateError } = await supabase
+    .from('products')
+    .update({ current_stock: newStock })
+    .eq('id', product.id);
 
-    if (!updateError) {
-      alert("✅ บันทึกสำเร็จ");
-      setProduct(null);
-      setShowConfirm(false);
-    }
-  };
+  if (!updateError) {
+    alert("✅ บันทึกรายการสำเร็จ!");
+    setProduct(null);
+    setShowConfirm(false);
+  }
+};
 
   return (
     <div className="flex flex-col h-[100dvh] bg-gray-950 text-slate-100 overflow-hidden font-sans">
