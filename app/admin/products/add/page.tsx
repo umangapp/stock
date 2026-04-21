@@ -10,7 +10,8 @@ export default function AddProductPage() {
   const [width, setWidth] = useState('')
   const [length, setLength] = useState('')
   const [height, setHeight] = useState('')
-  const [weight, setWeight] = useState('') // เพิ่มน้ำหนัก
+  const [weight, setWeight] = useState('')
+  const [currentStock, setCurrentStock] = useState('0') // เพิ่มสถานะจำนวนสต๊อกเริ่มต้น
   const [receiveDate, setReceiveDate] = useState('') 
   const [unit, setUnit] = useState('Kg')
   const [skuPreview, setSkuPreview] = useState('')
@@ -48,10 +49,10 @@ export default function AddProductPage() {
       width: parseFloat(width),
       length: parseFloat(length),
       height: parseFloat(height),
-      weight: parseFloat(weight) || 0, // ส่งค่าน้ำหนักไปยัง Supabase
+      weight: parseFloat(weight) || 0,
       receive_date_text: receiveDate,
       unit,
-      current_stock: 0
+      current_stock: parseInt(currentStock) || 0 // ส่งจำนวนที่กรอกไปยังฐานข้อมูล
     }])
 
     if (!error) {
@@ -83,33 +84,55 @@ export default function AddProductPage() {
               value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กแผ่นหนาพิเศษ" />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก)</label>
-            <input type="text" maxLength={3} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
-              value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="STB" />
-          </div>
-
-          {/* ขนาดและน้ำหนัก (2 แถว) */}
           <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก)</label>
+              <input type="text" maxLength={3} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
+                value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="STB" />
+            </div>
+            
+            {/* ขนาดและน้ำหนัก */}
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1">กว้าง (cm)</label>
               <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={width} onChange={(e) => setWidth(e.target.value)} placeholder="3.2" />
+                value={width} onChange={(e) => setWidth(e.target.value)} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1">ยาว (cm)</label>
               <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={length} onChange={(e) => setLength(e.target.value)} placeholder="10" />
+                value={length} onChange={(e) => setLength(e.target.value)} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1">สูง (cm)</label>
               <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={height} onChange={(e) => setHeight(e.target.value)} placeholder="2000" />
+                value={height} onChange={(e) => setHeight(e.target.value)} />
             </div>
             <div>
               <label className="block text-sm font-semibold text-gray-600 mb-1">น้ำหนัก (Kg)</label>
-              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg bg-yellow-50" 
-                value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="50.5" />
+              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
+                value={weight} onChange={(e) => setWeight(e.target.value)} />
+            </div>
+          </div>
+
+          <hr className="border-gray-100" />
+
+          {/* ส่วนของสต๊อกและวันที่ */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-bold text-green-700 mb-1">จำนวนสต๊อกเริ่มต้น</label>
+              <input type="number" required className="w-full border-green-200 border-2 p-3 rounded-lg bg-green-50 outline-none font-bold text-green-800" 
+                value={currentStock} onChange={(e) => setCurrentStock(e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">หน่วยนับ</label>
+              <select className="w-full border-gray-200 border p-3 rounded-lg outline-none bg-white font-medium" 
+                value={unit} onChange={(e) => setUnit(e.target.value)}>
+                <option value="Kg">Kg</option>
+                <option value="แพ็ค">แพ็ค</option>
+                <option value="เส้น">เส้น</option>
+                <option value="แผ่น">แผ่น</option>
+                <option value="กล่อง">กล่อง</option>
+              </select>
             </div>
           </div>
 
@@ -118,22 +141,10 @@ export default function AddProductPage() {
             <input type="text" maxLength={6} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-mono" 
               value={receiveDate} onChange={(e) => setReceiveDate(e.target.value.replace(/\D/g, ''))} placeholder="240606" />
           </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">หน่วยนับ</label>
-            <select className="w-full border-gray-200 border p-3 rounded-lg outline-none bg-white font-medium" 
-              value={unit} onChange={(e) => setUnit(e.target.value)}>
-              <option value="Kg">Kg</option>
-              <option value="แพ็ค">แพ็ค</option>
-              <option value="เส้น">เส้น</option>
-              <option value="แผ่น">แผ่น</option>
-              <option value="กล่อง">กล่อง</option>
-            </select>
-          </div>
         </div>
 
         <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95">
-          บันทึกข้อมูลสินค้า
+          บันทึกและเพิ่มเข้าสต๊อก
         </button>
       </form>
     </div>
