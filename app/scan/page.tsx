@@ -1,111 +1,156 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Html5QrcodeScanner } from 'html5-qr-code'
 import { supabase } from '@/lib/supabaseClient'
+import { Package, Minus, Plus, Camera, Search } from 'lucide-react'
 
 export default function ScanPage() {
+  const [scannedData, setScannedData] = useState<string | null>(null)
   const [product, setProduct] = useState<any>(null)
-  const [amount, setAmount] = useState(0)
-  const [note, setNote] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [manualCode, setManualCode] = useState('')
 
-  // ฟังก์ชันจำลองการสแกน (ในระบบจริงจะเชื่อมกับกล้อง)
-  const handleScan = async (sku: string) => {
+  useEffect(() => {
+    // ตั้งค่าตัวสแกน
+    const scanner = new Html5QrcodeScanner(
+      "reader", 
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      /* verbose= */ false
+    )
+
+    scanner.render(onScanSuccess, onScanFailure)
+
+    function onScanSuccess(decodedText: string) {
+      setScannedData(decodedText)
+      fetchProduct(decodedText)
+      scanner.clear() // หยุดสแกนเมื่อเจอแล้ว
+    }
+
+    function onScanFailure(error: any) {
+      // ไม่ต้องทำอะไร ปล่อยให้มันสแกนต่อไป
+    }
+
+    return () => scanner.clear() // ปิดกล้องเมื่อออกจากหน้า
+  }, [])
+
+  // ฟังก์ชันดึงข้อมูลสินค้าจาก SKU
+  const fetchProduct = async (sku: string) => {
+    setLoading(true)
     const { data, error } = await supabase
       .from('products')
       .select('*')
       .eq('sku_15_digits', sku)
       .single()
     
-    if (data) setProduct(data)
-    else alert('ไม่พบสินค้าชิ้นนี้ในระบบ')
+    if (data) {
+      setProduct(data)
+    } else {
+      alert('ไม่พบข้อมูลสินค้าชิ้นนี้ในระบบ: ' + sku)
+      setScannedData(null)
+    }
+    setLoading(false)
   }
 
-  const handleUpdateStock = async (type: 'เพิ่ม' | 'นำออก') => {
-    if (!product) return
-    
-    // คำนวณสต็อกใหม่
-    const change = type === 'เพิ่ม' ? amount : -amount
-    const newStock = product.current_stock + change
+  // ฟังก์ชันอัปเดตสต๊อก (+/-)
+  const updateStock = async (amount: number) => {
+    const newStock = product.current_stock + amount
+    if (newStock < 0) return
 
-    // ข้อ 3.2: ป้องกันสต๊อกติดลบหรือต่ำกว่า 1 (ถ้าเป็นกรณีนำออก)
-    if (type === 'นำออก' && newStock < 1) {
-      alert('ข้อผิดพลาด: สต๊อกห้ามต่ำกว่า 1 ตามนโยบาย Safety Stock')
-      return
-    }
-
-    // บันทึกรายการ (Transaction) และอัปเดตสต็อก
-    const { error } = await supabase.from('transactions').insert([{
-      product_id: product.id,
-      action_type: type,
-      quantity: amount,
-      stock_before: product.current_stock,
-      stock_after: newStock,
-      note: note
-    }])
+    const { error } = await supabase
+      .from('products')
+      .update({ current_stock: newStock })
+      .eq('id', product.id)
 
     if (!error) {
-      await supabase.from('products').update({ current_stock: newStock }).eq('id', product.id)
-      alert(`บันทึกการ ${type} สำเร็จ! ยอดใหม่คือ: ${newStock}`)
-      setProduct({...product, current_stock: newStock})
-      setAmount(0)
+      setProduct({ ...product, current_stock: newStock })
+      // บันทึก Transaction (Phase 3) สามารถเพิ่มตรงนี้ได้
     }
   }
 
   return (
-    <div className="p-4 max-w-md mx-auto bg-gray-50 min-h-screen">
-      <h1 className="text-xl font-bold mb-4">สแกนสินค้า</h1>
-      
-      {!product ? (
-        <div className="border-2 border-dashed border-gray-400 p-10 text-center rounded-lg">
-          <p>กดเพื่อเปิดกล้องสแกน QR Code</p>
-          <input 
-            type="text" 
-            placeholder="หรือกรอกรหัส 15 หลัก" 
-            className="mt-4 p-2 border w-full"
-            onKeyDown={(e) => e.key === 'Enter' && handleScan(e.currentTarget.value)}
-          />
-        </div>
-      ) : (
-        <div className="bg-white p-4 rounded-lg shadow">
-          <h2 className="font-bold text-lg">{product.name}</h2>
-          <p className="text-sm text-gray-500">รหัส: {product.sku_15_digits}</p>
-          <div className="my-2 p-2 bg-blue-50 rounded text-sm">
-            สต็อกปัจจุบัน: <span className="font-bold text-blue-700">{product.current_stock} {product.unit}</span>
-          </div>
+    <div className="p-4 max-w-md mx-auto bg-gray-50 min-h-screen pb-20">
+      <h1 className="text-xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+        <Camera className="text-blue-600" />
+        สแกน QR Code สินค้า
+      </h1>
 
-          {/* ปุ่มปรับจำนวน 5, 10, 50 ตามข้อ 4.5/4.6 */}
-          <div className="grid grid-cols-3 gap-2 my-4">
-            {[5, 10, 50].map(val => (
-              <button 
-                key={val} 
-                onClick={() => setAmount(prev => prev + val)}
-                className="bg-gray-200 py-2 rounded font-bold"
-              >+{val}</button>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between bg-gray-100 p-2 rounded mb-4">
-            <span className="text-sm">จำนวนที่จะปรับ:</span>
-            <span className="text-xl font-bold text-orange-600">{amount}</span>
-          </div>
-
-          <textarea 
-            placeholder="ระบุหมายเหตุ (ถ้ามี)" 
-            className="w-full border p-2 text-sm mb-4"
-            onChange={(e) => setNote(e.target.value)}
-          />
-
-          <div className="flex gap-2">
-            <button 
-              onClick={() => handleUpdateStock('เพิ่ม')}
-              className="flex-1 bg-green-200 text-green-800 py-3 rounded-lg font-bold"
-            >เพิ่ม</button>
-            <button 
-              onClick={() => handleUpdateStock('นำออก')}
-              className="flex-1 bg-red-200 text-red-800 py-3 rounded-lg font-bold"
-            >นำออก</button>
-          </div>
+      {/* ส่วนของกล้องสแกน */}
+      {!scannedData && (
+        <div className="space-y-4">
+          <div id="reader" className="overflow-hidden rounded-2xl border-0 shadow-lg bg-black"></div>
           
-          <button onClick={() => setProduct(null)} className="w-full mt-4 text-gray-400 text-sm">ยกเลิก/สแกนใหม่</button>
+          <div className="flex items-center gap-2">
+            <input 
+              type="text" 
+              placeholder="หรือกรอกรหัส 15 หลัก..." 
+              className="flex-1 p-3 rounded-xl border border-gray-200 outline-none"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+            />
+            <button 
+              onClick={() => { setScannedData(manualCode); fetchProduct(manualCode); }}
+              className="bg-gray-800 text-white p-3 rounded-xl"
+            >
+              <Search size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* เมื่อสแกนติดแล้ว จะโชว์ข้อมูลสินค้า */}
+      {loading && <div className="text-center p-10 font-bold">กำลังค้นหา...</div>}
+
+      {scannedData && product && !loading && (
+        <div className="bg-white p-6 rounded-3xl shadow-xl border border-blue-100 animate-in fade-in zoom-in duration-300">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <p className="text-xs text-blue-500 font-bold uppercase tracking-wider">พบสินค้าแล้ว</p>
+              <h2 className="text-2xl font-bold text-gray-800 leading-tight">{product.name}</h2>
+              <p className="text-sm font-mono text-gray-400 mt-1">{product.sku_15_digits}</p>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-2xl">
+              <Package className="text-blue-600" size={30} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+            <div className="bg-gray-50 p-3 rounded-xl">
+              <span className="text-gray-400 block">ขนาด</span>
+              <span className="font-bold">{product.width}x{product.length}x{product.height}</span>
+            </div>
+            <div className="bg-gray-50 p-3 rounded-xl">
+              <span className="text-gray-400 block">หน่วย</span>
+              <span className="font-bold">{product.unit}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center p-6 bg-blue-600 rounded-3xl text-white">
+            <span className="text-sm opacity-80 mb-2">สต๊อกคงเหลือปัจจุบัน</span>
+            <span className="text-6xl font-black">{product.current_stock}</span>
+          </div>
+
+          {/* ปุ่มเพิ่มลดสต๊อก */}
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            <button 
+              onClick={() => updateStock(-1)}
+              className="flex items-center justify-center gap-2 bg-red-100 text-red-600 py-4 rounded-2xl font-bold active:scale-95 transition-all"
+            >
+              <Minus size={20} /> จ่ายออก
+            </button>
+            <button 
+              onClick={() => updateStock(1)}
+              className="flex items-center justify-center gap-2 bg-green-100 text-green-600 py-4 rounded-2xl font-bold active:scale-95 transition-all"
+            >
+              <Plus size={20} /> รับเข้า
+            </button>
+          </div>
+
+          <button 
+            onClick={() => { setScannedData(null); setProduct(null); window.location.reload(); }}
+            className="w-full mt-6 text-gray-400 text-sm font-medium hover:text-gray-600 underline"
+          >
+            สแกนชิ้นต่อไป
+          </button>
         </div>
       )}
     </div>
