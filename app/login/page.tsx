@@ -30,7 +30,7 @@ export default function LoginPage() {
           <div className="inline-block p-4 bg-blue-600 rounded-[2rem] shadow-xl shadow-blue-900/40 mb-4">
             <LogIn size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">Stock Management</h1>
+          <h1 className="text-2xl font-black text-white uppercase italic tracking-tighter">UMANGBKK Stock Management</h1>
           <p className="text-gray-500 text-xs mt-2 uppercase font-bold tracking-widest">Login to Access System</p>
         </div>
 
