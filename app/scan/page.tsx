@@ -75,15 +75,15 @@ export default function ScanPage() {
       .eq('id', product.id);
 
     // เพิ่มการเช็ก Error ตรงนี้ครับ
-  const { error: txError } = await supabase.from('transactions').insert([{
-    product_id: product.id,
-    type: mode,
-    amount: adjustment,
-    stock_before: product.current_stock,
-    stock_after: newStock,
-    note: note,
-    created_by: userName
-  }]);
+const { error: txError } = await supabase.from('transactions').insert([{
+  product_id: product.id,
+  type: mode,
+  quantity: adjustment, // เปลี่ยนจาก amount: เป็น quantity:
+  stock_before: product.current_stock,
+  stock_after: newStock,
+  note: note,
+  created_by: userName
+}]);
 
   if (txError) {
     console.error("Transaction Error:", txError); // ดูใน Inspect ของบราวเซอร์
