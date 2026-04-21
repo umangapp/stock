@@ -16,7 +16,7 @@ export default function ScanPage() {
       .single()
     
     if (data) setProduct(data)
-    else alert('ไม่พบสินค้าชิ้นนี้ในระบบ') [cite: 22, 23]
+    else alert('ไม่พบสินค้าชิ้นนี้ในระบบ')
   }
 
   const handleUpdateStock = async (type: 'เพิ่ม' | 'นำออก') => {
