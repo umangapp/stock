@@ -6,34 +6,28 @@ import { useRouter } from 'next/navigation'
 export default function AddProductPage() {
   const router = useRouter()
   const [name, setName] = useState('') 
-  const [prefix, setPrefix] = useState('') // ตัวย่อสินค้า 2-3 หลัก
+  const [prefix, setPrefix] = useState('') 
   const [width, setWidth] = useState('')
   const [length, setLength] = useState('')
   const [height, setHeight] = useState('')
+  const [weight, setWeight] = useState('') // เพิ่มน้ำหนัก
   const [receiveDate, setReceiveDate] = useState('') 
   const [unit, setUnit] = useState('Kg')
   const [skuPreview, setSkuPreview] = useState('')
 
   useEffect(() => {
-    // ตรวจสอบว่ากรอกข้อมูลสำคัญครบ (ตัวย่อต้อง 2 หลักขึ้นไป)
     if (prefix.length >= 2 && width && length && height && receiveDate.length === 6) {
-      
       const formatDim = (val: string) => {
         const clean = val.replace('.', '') 
         return clean.substring(0, 2).padStart(2, '0')
       }
-
       const wPart = formatDim(width)
       const lPart = formatDim(length)
       const hPart = formatDim(height)
       const datePart = receiveDate 
 
-      // รวมร่างรหัสพื้นฐาน
       const baseSku = `${prefix.toUpperCase()}${wPart}${lPart}${hPart}${datePart}`
-      
-      // ปรับให้ครบ 15 หลักพอดี (ถ้า 14 จะเติม x, ถ้า 15 จะไม่เติม)
       const finalSku = baseSku.padEnd(15, 'x')
-      
       setSkuPreview(finalSku)
     } else {
       setSkuPreview('รอข้อมูลครบ...')
@@ -54,6 +48,7 @@ export default function AddProductPage() {
       width: parseFloat(width),
       length: parseFloat(length),
       height: parseFloat(height),
+      weight: parseFloat(weight) || 0, // ส่งค่าน้ำหนักไปยัง Supabase
       receive_date_text: receiveDate,
       unit,
       current_stock: 0
@@ -85,25 +80,37 @@ export default function AddProductPage() {
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">ชื่อสินค้า</label>
             <input type="text" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กเส้นกลม" />
+              value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กแผ่นหนาพิเศษ" />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก เช่น ST, STB)</label>
+            <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก)</label>
             <input type="text" maxLength={3} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
               value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="STB" />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div><label className="block text-sm font-semibold text-gray-600 mb-1">กว้าง</label>
-            <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={width} onChange={(e) => setWidth(e.target.value)} placeholder="3.2" /></div>
-            <div><label className="block text-sm font-semibold text-gray-600 mb-1">ยาว</label>
-            <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={length} onChange={(e) => setLength(e.target.value)} placeholder="10" /></div>
-            <div><label className="block text-sm font-semibold text-gray-600 mb-1">สูง</label>
-            <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={height} onChange={(e) => setHeight(e.target.value)} placeholder="2000" /></div>
+          {/* ขนาดและน้ำหนัก (2 แถว) */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">กว้าง (cm)</label>
+              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
+                value={width} onChange={(e) => setWidth(e.target.value)} placeholder="3.2" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">ยาว (cm)</label>
+              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
+                value={length} onChange={(e) => setLength(e.target.value)} placeholder="10" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">สูง (cm)</label>
+              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
+                value={height} onChange={(e) => setHeight(e.target.value)} placeholder="2000" />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-600 mb-1">น้ำหนัก (Kg)</label>
+              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg bg-yellow-50" 
+                value={weight} onChange={(e) => setWeight(e.target.value)} placeholder="50.5" />
+            </div>
           </div>
 
           <div>
