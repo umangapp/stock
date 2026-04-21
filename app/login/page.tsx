@@ -17,7 +17,7 @@ export default function LoginPage() {
       alert('Login ล้มเหลว: ' + error.message)
     } else {
       alert('ยินดีต้อนรับ! เข้าสู่ระบบสำเร็จ')
-      // ระบบจะบันทึกเวลา Login อัตโนมัติตามสเปกข้อ 1.9 [cite: 19]
+      // ระบบจะบันทึกเวลา Login อัตโนมัติตามสเปกข้อ 1.9
       window.location.href = '/dashboard'
     }
   }
