@@ -10,12 +10,14 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",
-    "lucide-react": "^0.344.0",
-    "next": "14.1.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "xlsx": "^0.18.5",
-    "html5-qrcode": "^2.3.8"
+  "jspdf": "^2.5.1",
+  "jspdf-autotable": "^3.8.2",
+  "recharts": "^2.12.2",
+  "xlsx": "^0.18.5",
+  "lucide-react": "^0.344.0",
+  "next": "14.1.0",
+  "react": "^18",
+  "react-dom": "^18"
   },
   "devDependencies": {
     "@types/node": "^20.11.24",
