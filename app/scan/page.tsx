@@ -18,6 +18,22 @@ export default function ScanPage() {
 
   const isStockShort = mode === 'issue' && adjustment > (product?.current_stock || 0);
 
+// เพิ่ม useEffect เพื่อเช็ก User
+const [userName, setUserName] = useState('Guest')
+
+useEffect(() => {
+  const getUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      // ใช้ Email หรือ Metadata ชื่อมาแสดง
+      setUserName(user.email?.split('@')[0].toUpperCase() || 'USER')
+    } else {
+      router.push('/login') // ถ้าไม่ได้ล็อคอิน ให้เด้งไปหน้า Login
+    }
+  }
+  getUser()
+}, [])
+  
   const startScanner = async () => {
     const html5QrCode = new Html5Qrcode("reader");
     setIsScanning(true);
