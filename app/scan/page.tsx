@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { Minus, Plus, Camera, Search, RefreshCw, X, User, Clock, ArrowRight, AlertCircle, MessageSquare } from 'lucide-react'
+import { Minus, Plus, Camera, Search, RefreshCw, X, User, Clock, ArrowRight, MessageSquare } from 'lucide-react'
 
 export default function ScanPage() {
   const [product, setProduct] = useState<any>(null)
@@ -15,9 +15,6 @@ export default function ScanPage() {
   const [note, setNote] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [userName] = useState('Admin') 
-
-  // ระบบดักสต๊อกติดลบ
-  const isStockShort = mode === 'issue' && adjustment > (product?.current_stock || 0);
 
   const startScanner = async () => {
     const html5QrCode = new Html5Qrcode("reader");
@@ -33,7 +30,7 @@ export default function ScanPage() {
         () => {}
       );
     } catch (err) {
-      alert("เปิดกล้องไม่ได้: โปรดตรวจสอบการอนุญาตสิทธิ์กล้อง");
+      alert("เปิดกล้องไม่ได้: โปรดตรวจสอบสิทธิ์การเข้าถึงกล้อง");
       setIsScanning(false);
     }
   };
@@ -50,6 +47,27 @@ export default function ScanPage() {
     }
     setLoading(false)
   }
+
+  // ฟังก์ชันดักการเพิ่มจำนวน (Smart Cap)
+  const handleQuickAdd = (num: number) => {
+    setAdjustment(prev => {
+      const next = prev + num;
+      if (mode === 'issue' && next > product.current_stock) {
+        return product.current_stock; // ถ้าจ่ายออก ห้ามเกินสต๊อกที่มี
+      }
+      return next;
+    });
+  };
+
+  // ฟังก์ชันดักการพิมพ์ตัวเลข (Manual Cap)
+  const handleManualInput = (val: string) => {
+    let num = parseInt(val) || 0;
+    if (num < 0) num = 0;
+    if (mode === 'issue' && num > product.current_stock) {
+      num = product.current_stock; // ถ้าพิมพ์เกินสต๊อก ให้ปัดลงมาที่ค่าสูงสุด
+    }
+    setAdjustment(num);
+  };
 
   const confirmUpdate = async () => {
     const finalAmount = mode === 'receive' ? adjustment : -adjustment;
@@ -70,7 +88,7 @@ export default function ScanPage() {
         note: note,
         created_by: userName
       }]);
-      alert(`✅ บันทึกสำเร็จ! สต๊อกใหม่: ${newStock}`);
+      alert(`✅ บันทึกสำเร็จ! ยอดปัจจุบันคือ ${newStock}`);
       setProduct(null);
       setShowConfirm(false);
     }
@@ -79,21 +97,20 @@ export default function ScanPage() {
   return (
     <div className="flex flex-col h-[100dvh] bg-gray-950 text-slate-100 overflow-hidden font-sans">
       
-      {/* 1. Header - ขนาดกะทัดรัด */}
+      {/* 1. Header */}
       <header className="p-3 flex justify-between items-center bg-black/20 border-b border-white/5">
         <h1 className="text-xs font-bold tracking-widest flex items-center gap-2">
-          <Camera size={16} className="text-blue-400" /> SCAN & STOCK
+          <Camera size={16} className="text-blue-400" /> STOCK SYSTEM
         </h1>
         {product && (
           <button onClick={() => setProduct(null)} className="p-1.5 bg-white/10 rounded-full active:scale-90 transition-all">
-            <X size={16} />
+            <X size={18} />
           </button>
         )}
       </header>
 
       <main className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
         
-        {/* 2. Scanner Area */}
         {!product && (
           <div className="flex-1 flex flex-col gap-3">
             <div className="flex-1 relative rounded-[2.5rem] bg-black overflow-hidden border border-white/10 shadow-2xl">
@@ -101,18 +118,16 @@ export default function ScanPage() {
               {!isScanning && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
                   <button onClick={startScanner} className="bg-blue-600 px-10 py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all">เปิดกล้องสแกน</button>
-                  <p className="text-[10px] mt-4 opacity-40 uppercase font-bold tracking-widest">Umang BKK Stock System</p>
                 </div>
               )}
             </div>
             <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/10">
-              <input type="text" placeholder="พิมพ์รหัสสินค้า..." className="flex-1 bg-transparent px-3 outline-none text-sm" value={manualCode} onChange={(e) => setManualCode(e.target.value)} />
+              <input type="text" placeholder="พิมพ์รหัส 15 หลัก..." className="flex-1 bg-transparent px-3 outline-none text-sm" value={manualCode} onChange={(e) => setManualCode(e.target.value)} />
               <button onClick={() => fetchProduct(manualCode)} className="bg-blue-600 p-3 rounded-xl active:scale-90 transition-all"><Search size={20} /></button>
             </div>
           </div>
         )}
 
-        {/* 3. Control Panel - No Scroll Design */}
         {product && !showConfirm && (
           <div className="flex-1 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-5 duration-300">
             
@@ -123,7 +138,7 @@ export default function ScanPage() {
                 <p className="text-[10px] font-mono opacity-60 truncate">{product.sku_15_digits}</p>
               </div>
               <div className="text-right ml-4">
-                <p className="text-[9px] opacity-70 font-bold uppercase mb-1">Stock</p>
+                <p className="text-[9px] opacity-70 font-bold uppercase mb-1 tracking-tighter">สต๊อกปัจจุบัน</p>
                 <p className="text-4xl font-black leading-none">{product.current_stock}</p>
               </div>
             </div>
@@ -133,25 +148,28 @@ export default function ScanPage() {
               
               {/* Tab Switcher */}
               <div className="flex p-1 bg-gray-100 rounded-2xl">
-                <button onClick={() => setMode('receive')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'receive' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>
+                <button onClick={() => {setMode('receive'); setAdjustment(0);}} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'receive' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>
                   <Plus size={14}/> รับเข้า
                 </button>
-                <button onClick={() => setMode('issue')} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'issue' ? 'bg-white shadow-sm text-red-600' : 'text-gray-400'}`}>
+                <button onClick={() => {setMode('issue'); setAdjustment(0);}} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'issue' ? 'bg-white shadow-sm text-red-600' : 'text-gray-400'}`}>
                   <Minus size={14}/> จ่ายออก
                 </button>
               </div>
 
-              {/* Number Input Group - Fixed Overflow */}
+              {/* Number Input Group - ล็อคขอบขวา */}
               <div className="flex w-full items-stretch gap-2 h-16">
                 <input 
                   type="number" 
                   inputMode="numeric"
-                  className={`flex-1 w-0 min-w-0 text-3xl font-black rounded-2xl bg-gray-50 border-2 text-center outline-none transition-all ${isStockShort ? 'border-red-500 text-red-600 bg-red-50' : 'border-transparent focus:border-blue-500'}`} 
+                  className={`flex-1 w-0 min-w-0 text-3xl font-black rounded-2xl bg-gray-50 border-2 text-center outline-none transition-all ${mode === 'issue' && adjustment >= product.current_stock ? 'border-red-500 text-red-600 bg-red-50' : 'border-transparent focus:border-blue-500'}`} 
                   value={adjustment || ''} 
-                  onChange={(e) => setAdjustment(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={(e) => handleManualInput(e.target.value)}
                   placeholder="0"
                 />
-                <button onClick={() => setAdjustment(prev => Math.max(0, prev - 1))} className="w-16 flex-shrink-0 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 active:bg-gray-200">
+                <button 
+                  onClick={() => setAdjustment(prev => Math.max(0, prev - 1))} 
+                  className="w-16 flex-shrink-0 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 active:bg-gray-200"
+                >
                   <Minus size={24} />
                 </button>
               </div>
@@ -159,15 +177,19 @@ export default function ScanPage() {
               {/* Quick Buttons */}
               <div className="grid grid-cols-4 gap-2">
                 {[1, 5, 10, 50].map(num => (
-                  <button key={num} onClick={() => setAdjustment(prev => prev + num)} className={`py-3.5 rounded-2xl font-black text-sm active:scale-90 transition-all ${mode === 'receive' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  <button 
+                    key={num} 
+                    onClick={() => handleQuickAdd(num)} 
+                    className={`py-3.5 rounded-2xl font-black text-sm active:scale-90 transition-all ${mode === 'receive' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}
+                  >
                     {mode === 'receive' ? '+' : '-'}{num}
                   </button>
                 ))}
               </div>
 
-              {/* Status/Calculation */}
-              <div className={`p-4 rounded-2xl border-2 border-dashed flex justify-between items-center transition-colors ${mode === 'receive' ? 'bg-green-50/50 border-green-200' : isStockShort ? 'bg-red-50 border-red-500' : 'bg-red-50/50 border-red-200'}`}>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Result</span>
+              {/* Calculation Summary */}
+              <div className={`p-4 rounded-2xl border-2 border-dashed flex justify-between items-center transition-all ${mode === 'receive' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">คำนวณ</span>
                 <span className={`text-xl font-black ${mode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
                   {product.current_stock} {mode === 'receive' ? '+' : '-'} {adjustment} = {mode === 'receive' ? product.current_stock + adjustment : product.current_stock - adjustment}
                 </span>
@@ -176,18 +198,18 @@ export default function ScanPage() {
               {/* Compact Note */}
               <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-2xl border border-gray-100">
                 <MessageSquare size={16} className="text-gray-300" />
-                <input type="text" placeholder="ระบุหมายเหตุ (ถ้ามี)..." className="bg-transparent flex-1 text-sm outline-none font-medium" value={note} onChange={(e) => setNote(e.target.value)} />
+                <input type="text" placeholder="ระบุหมายเหตุ..." className="bg-transparent flex-1 text-sm outline-none font-medium" value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
 
               {/* Action Buttons */}
               <div className="flex gap-2 mt-auto pt-2">
-                <button onClick={() => setProduct(null)} className="flex-1 py-4 bg-gray-50 text-gray-400 rounded-2xl font-bold text-sm">Cancel</button>
+                <button onClick={() => setProduct(null)} className="flex-1 py-4 bg-gray-50 text-gray-400 rounded-2xl font-bold text-sm active:scale-95 transition-all">ยกเลิก</button>
                 <button 
                   onClick={() => setShowConfirm(true)} 
-                  disabled={adjustment === 0 || isStockShort}
-                  className={`flex-[2.5] py-4 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95 ${adjustment === 0 || isStockShort ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white shadow-blue-200'}`}
+                  disabled={adjustment === 0}
+                  className={`flex-[2.5] py-4 rounded-2xl font-black text-sm shadow-xl transition-all active:scale-95 ${adjustment === 0 ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white shadow-blue-200'}`}
                 >
-                  {isStockShort ? 'สต๊อกไม่พอจ่าย' : 'ยืนยันรายการ'}
+                  บันทึกรายการ
                 </button>
               </div>
             </div>
@@ -195,34 +217,32 @@ export default function ScanPage() {
         )}
       </main>
 
-      {/* 4. Confirmation Overlay */}
+      {/* Confirmation Overlay */}
       {showConfirm && (
         <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-md z-50 flex items-center justify-center p-6">
           <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden text-gray-900 animate-in zoom-in duration-300 shadow-2xl border border-white">
             <div className={`p-8 text-center text-white ${mode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>
-              <h3 className="text-2xl font-black">ยืนยันบันทึก</h3>
+              <h3 className="text-2xl font-black">ยืนยันรายการ</h3>
               <p className="text-[10px] opacity-70 uppercase tracking-[0.2em] mt-1 font-bold">{userName} • {new Date().toLocaleTimeString('th-TH')}</p>
             </div>
             <div className="p-8 space-y-6">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-400 font-bold uppercase tracking-tighter">สต๊อกเดิม</span>
+              <div className="flex justify-between items-center text-sm border-b border-gray-50 pb-2">
+                <span className="text-gray-400 font-bold uppercase tracking-tighter">ยอดปัจจุบัน</span>
                 <span className="font-bold text-gray-400">{product.current_stock} {product.unit}</span>
               </div>
               <div className="bg-gray-50 p-6 rounded-[2rem] flex items-center justify-between border-2 border-gray-100 shadow-inner">
-                <span className="text-gray-400 text-xs font-black uppercase">ยอดใหม่</span>
+                <span className="text-gray-400 text-xs font-black uppercase">ยอดหลังอัปเดต</span>
                 <span className={`text-5xl font-black ${mode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
                   {mode === 'receive' ? product.current_stock + adjustment : product.current_stock - adjustment}
                 </span>
               </div>
-              {note && (
-                <div className="text-xs text-gray-400 bg-gray-50 p-3 rounded-xl border border-gray-100 flex gap-2">
-                  <span className="font-bold shrink-0">NOTE:</span>
-                  <span className="italic">{note}</span>
-                </div>
-              )}
+              <div className="text-xs text-gray-400 bg-gray-50 p-4 rounded-2xl border border-gray-100 flex gap-2">
+                <span className="font-bold shrink-0 uppercase">Note:</span>
+                <span className="italic">{note || '-'}</span>
+              </div>
               <div className="flex gap-4 pt-4">
-                <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 font-bold text-gray-300 active:text-gray-500">แก้ไข</button>
-                <button onClick={confirmUpdate} className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 active:scale-95 transition-all">บันทึกทันที</button>
+                <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 font-bold text-gray-300 active:text-gray-500 transition-colors">แก้ไข</button>
+                <button onClick={confirmUpdate} className="flex-[2.5] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200 active:scale-95 transition-all">บันทึกข้อมูล</button>
               </div>
             </div>
           </div>
