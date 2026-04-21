@@ -10,18 +10,28 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+const handleLogin = async (e: React.FormEvent) => {
+  e.preventDefault()
+  setLoading(true)
+  console.log("กำลังพยายาม Login ด้วย:", email) // เช็กว่าฟังก์ชันทำงานไหม
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     
     if (error) {
-      alert("เข้าสู่ระบบไม่สำเร็จ: " + error.message)
-    } else {
-      router.push('/scan') // เมื่อผ่านแล้วให้ไปหน้าสแกน
+      console.error("Login Error:", error.message)
+      alert("Error: " + error.message) // ให้มันเด้งเตือนเลยว่าติดอะไร
+    } else if (data.user) {
+      console.log("Login สำเร็จ!", data.user)
+      router.push('/scan')
     }
+  } catch (err) {
+    console.error("Unexpected Error:", err)
+    alert("เกิดข้อผิดพลาดที่คาดไม่ถึง")
+  } finally {
     setLoading(false)
   }
+}
 
   return (
     <div className="flex flex-col h-[100dvh] items-center justify-center bg-gray-950 p-6">
