@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 
 export default function AddProductPage() {
   const router = useRouter()
-  const [name, setName] = useState('') // ชื่อสินค้า
-  const [prefix, setPrefix] = useState('') // ตัวย่อสินค้า (เช่น ST)
+  const [name, setName] = useState('') 
+  const [prefix, setPrefix] = useState('') // ตัวย่อสินค้า 2-3 หลัก
   const [width, setWidth] = useState('')
   const [length, setLength] = useState('')
   const [height, setHeight] = useState('')
@@ -15,8 +15,8 @@ export default function AddProductPage() {
   const [skuPreview, setSkuPreview] = useState('')
 
   useEffect(() => {
-    // ต้องกรอกครบ: ตัวย่อ(prefix), กว้าง, ยาว, สูง และวันที่(6 หลัก)
-    if (prefix && width && length && height && receiveDate.length === 6) {
+    // ตรวจสอบว่ากรอกข้อมูลสำคัญครบ (ตัวย่อต้อง 2 หลักขึ้นไป)
+    if (prefix.length >= 2 && width && length && height && receiveDate.length === 6) {
       
       const formatDim = (val: string) => {
         const clean = val.replace('.', '') 
@@ -28,8 +28,10 @@ export default function AddProductPage() {
       const hPart = formatDim(height)
       const datePart = receiveDate 
 
-      // ใช้ prefix ที่กรอกมาแทนการล็อค ST
+      // รวมร่างรหัสพื้นฐาน
       const baseSku = `${prefix.toUpperCase()}${wPart}${lPart}${hPart}${datePart}`
+      
+      // ปรับให้ครบ 15 หลักพอดี (ถ้า 14 จะเติม x, ถ้า 15 จะไม่เติม)
       const finalSku = baseSku.padEnd(15, 'x')
       
       setSkuPreview(finalSku)
@@ -47,7 +49,7 @@ export default function AddProductPage() {
 
     const { error } = await supabase.from('products').insert([{
       name,
-      prefix: prefix.toUpperCase(), // บันทึกตัวย่อแยกไว้ด้วย
+      prefix: prefix.toUpperCase(),
       sku_15_digits: skuPreview,
       width: parseFloat(width),
       length: parseFloat(length),
@@ -58,7 +60,7 @@ export default function AddProductPage() {
     }])
 
     if (!error) {
-      alert('เพิ่มสินค้าสำเร็จ! รหัส: ' + skuPreview)
+      alert('เพิ่มสินค้าสำเร็จ! รหัสคือ: ' + skuPreview)
       router.push('/dashboard')
     } else {
       alert('Error: ' + error.message)
@@ -73,28 +75,25 @@ export default function AddProductPage() {
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* กล่อง Preview รหัส */}
+        {/* กล่อง Preview รหัส 15 หลัก */}
         <div className="p-5 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-lg text-white">
           <label className="text-xs opacity-80 uppercase font-bold tracking-wider">รหัสสินค้าที่จะถูกสร้าง (15 หลัก)</label>
           <div className="text-2xl font-mono font-bold mt-1 tracking-widest">{skuPreview}</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl shadow-sm space-y-4 border border-gray-100">
-          {/* Field 1: ชื่อสินค้า */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">ชื่อสินค้า</label>
             <input type="text" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กแผ่นหนา" />
+              value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กเส้นกลม" />
           </div>
 
-          {/* Field 2: ตัวย่อสินค้า */}
           <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2 หลัก เช่น ST, IR)</label>
-            <input type="text" maxLength={2} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
-              value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="ST" />
+            <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก เช่น ST, STB)</label>
+            <input type="text" maxLength={3} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
+              value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="STB" />
           </div>
 
-          {/* ขนาดสินค้า */}
           <div className="grid grid-cols-3 gap-3">
             <div><label className="block text-sm font-semibold text-gray-600 mb-1">กว้าง</label>
             <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
@@ -107,17 +106,15 @@ export default function AddProductPage() {
               value={height} onChange={(e) => setHeight(e.target.value)} placeholder="2000" /></div>
           </div>
 
-          {/* วันที่ YYMMDD */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">วันที่รับสินค้า (YYMMDD)</label>
             <input type="text" maxLength={6} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-mono" 
               value={receiveDate} onChange={(e) => setReceiveDate(e.target.value.replace(/\D/g, ''))} placeholder="240606" />
           </div>
 
-          {/* หน่วยนับ (อัปเดตตามที่คุณแจ้ง) */}
           <div>
             <label className="block text-sm font-semibold text-gray-600 mb-1">หน่วยนับ</label>
-            <select className="w-full border-gray-200 border p-3 rounded-lg outline-none bg-white" 
+            <select className="w-full border-gray-200 border p-3 rounded-lg outline-none bg-white font-medium" 
               value={unit} onChange={(e) => setUnit(e.target.value)}>
               <option value="Kg">Kg</option>
               <option value="แพ็ค">แพ็ค</option>
