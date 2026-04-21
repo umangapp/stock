@@ -10,10 +10,11 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8",
-  "jspdf": "^2.5.1",
-  "jspdf-autotable": "^3.8.2",
+  "html5-qrcode": "^2.3.8",
   "recharts": "^2.12.2",
   "xlsx": "^0.18.5",
+  "jspdf": "^2.5.1",
+  "jspdf-autotable": "^3.8.2",
   "lucide-react": "^0.344.0",
   "next": "14.1.0",
   "react": "^18",
