@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Html5QrcodeScanner } from 'html5-qr-code'
+import { Html5QrcodeScanner } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
 import { Package, Minus, Plus, Camera, Search } from 'lucide-react'
 
