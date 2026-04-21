@@ -13,21 +13,19 @@ export default function LoginPage() {
 const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault()
   setLoading(true)
-  console.log("กำลังพยายาม Login ด้วย:", email) // เช็กว่าฟังก์ชันทำงานไหม
+  alert("1. เริ่มส่งข้อมูลไป Supabase...");
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     
     if (error) {
-      console.error("Login Error:", error.message)
-      alert("Error: " + error.message) // ให้มันเด้งเตือนเลยว่าติดอะไร
-    } else if (data.user) {
-      console.log("Login สำเร็จ!", data.user)
+      alert("2. เจอ Error: " + error.message);
+    } else {
+      alert("3. Login สำเร็จ! กำลังจะไปหน้าสแกน...");
       router.push('/scan')
     }
   } catch (err) {
-    console.error("Unexpected Error:", err)
-    alert("เกิดข้อผิดพลาดที่คาดไม่ถึง")
+    alert("เกิดข้อผิดพลาด: " + JSON.stringify(err));
   } finally {
     setLoading(false)
   }
