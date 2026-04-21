@@ -28,7 +28,7 @@ export default function ScanPage() {
 
     // ข้อ 3.2: ป้องกันสต๊อกติดลบหรือต่ำกว่า 1 (ถ้าเป็นกรณีนำออก)
     if (type === 'นำออก' && newStock < 1) {
-      alert('ข้อผิดพลาด: สต๊อกห้ามต่ำกว่า 1 ตามนโยบาย Safety Stock') [cite: 32]
+      alert('ข้อผิดพลาด: สต๊อกห้ามต่ำกว่า 1 ตามนโยบาย Safety Stock')
       return
     }
 
@@ -40,11 +40,11 @@ export default function ScanPage() {
       stock_before: product.current_stock,
       stock_after: newStock,
       note: note
-    }]) [cite: 30, 33, 35, 38, 39]
+    }])
 
     if (!error) {
       await supabase.from('products').update({ current_stock: newStock }).eq('id', product.id)
-      alert(`บันทึกการ ${type} สำเร็จ! ยอดใหม่คือ: ${newStock}`) [cite: 40]
+      alert(`บันทึกการ ${type} สำเร็จ! ยอดใหม่คือ: ${newStock}`)
       setProduct({...product, current_stock: newStock})
       setAmount(0)
     }
@@ -62,7 +62,7 @@ export default function ScanPage() {
             placeholder="หรือกรอกรหัส 15 หลัก" 
             className="mt-4 p-2 border w-full"
             onKeyDown={(e) => e.key === 'Enter' && handleScan(e.currentTarget.value)}
-          /> [cite: 21, 43]
+          />
         </div>
       ) : (
         <div className="bg-white p-4 rounded-lg shadow">
@@ -70,7 +70,7 @@ export default function ScanPage() {
           <p className="text-sm text-gray-500">รหัส: {product.sku_15_digits}</p>
           <div className="my-2 p-2 bg-blue-50 rounded text-sm">
             สต็อกปัจจุบัน: <span className="font-bold text-blue-700">{product.current_stock} {product.unit}</span>
-          </div> [cite: 23, 27]
+          </div>
 
           {/* ปุ่มปรับจำนวน 5, 10, 50 ตามข้อ 4.5/4.6 */}
           <div className="grid grid-cols-3 gap-2 my-4">
@@ -80,7 +80,7 @@ export default function ScanPage() {
                 onClick={() => setAmount(prev => prev + val)}
                 className="bg-gray-200 py-2 rounded font-bold"
               >+{val}</button>
-            ))} [cite: 45, 46]
+            ))}
           </div>
 
           <div className="flex items-center justify-between bg-gray-100 p-2 rounded mb-4">
@@ -92,7 +92,7 @@ export default function ScanPage() {
             placeholder="ระบุหมายเหตุ (ถ้ามี)" 
             className="w-full border p-2 text-sm mb-4"
             onChange={(e) => setNote(e.target.value)}
-          /> [cite: 35]
+          />
 
           <div className="flex gap-2">
             <button 
@@ -103,7 +103,7 @@ export default function ScanPage() {
               onClick={() => handleUpdateStock('นำออก')}
               className="flex-1 bg-red-200 text-red-800 py-3 rounded-lg font-bold"
             >นำออก</button>
-          </div> [cite: 34, 44]
+          </div>
           
           <button onClick={() => setProduct(null)} className="w-full mt-4 text-gray-400 text-sm">ยกเลิก/สแกนใหม่</button>
         </div>
