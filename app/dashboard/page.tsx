@@ -1,3 +1,21 @@
+const [isClient, setIsClient] = useState(false)
+<div className="h-72 w-full">
+  {isClient ? (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={transactions.slice(0, 10)}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+        <XAxis dataKey="created_at" tickFormatter={(str) => new Date(str).toLocaleDateString()} />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="amount" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>
+  ) : (
+    <div className="flex items-center justify-center h-full text-gray-400">
+      กำลังโหลดกราฟ...
+    </div>
+  )}
+</div>
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -24,9 +42,10 @@ export default function AdminDashboard() {
   const [selectedStaff, setSelectedStaff] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
 
-  useEffect(() => {
-    fetchData()
-  }, [])
+useEffect(() => {
+  setIsClient(true)
+  fetchData() // ฟังก์ชันเดิมของคุณ
+}, [])
 
   const fetchData = async () => {
     setLoading(true)
