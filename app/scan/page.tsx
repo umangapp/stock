@@ -11,32 +11,33 @@ export default function ScanPage() {
   const [manualCode, setManualCode] = useState('')
 
   useEffect(() => {
-    // ตั้งค่าตัวสแกน
     const scanner = new Html5QrcodeScanner(
       "reader", 
       { fps: 10, qrbox: { width: 250, height: 250 } },
-      /* verbose= */ false
+      false
     )
+
+    const onScanSuccess = (decodedText: string) => {
+      setScannedData(decodedText)
+      fetchProduct(decodedText)
+      scanner.clear().catch(err => console.error("Failed to clear scanner", err))
+    }
+
+    const onScanFailure = (error: any) => {
+      // ปล่อยผ่านเพื่อให้สแกนต่อไป
+    }
 
     scanner.render(onScanSuccess, onScanFailure)
 
-    function onScanSuccess(decodedText: string) {
-      setScannedData(decodedText)
-      fetchProduct(decodedText)
-      scanner.clear() // หยุดสแกนเมื่อเจอแล้ว
+    // แก้ไขตรงนี้: เขียน Cleanup function ให้ถูกต้อง
+    return () => {
+      scanner.clear().catch(err => console.error("Cleanup error", err))
     }
-
-    function onScanFailure(error: any) {
-      // ไม่ต้องทำอะไร ปล่อยให้มันสแกนต่อไป
-    }
-
-    return () => scanner.clear() // ปิดกล้องเมื่อออกจากหน้า
   }, [])
 
-  // ฟังก์ชันดึงข้อมูลสินค้าจาก SKU
   const fetchProduct = async (sku: string) => {
     setLoading(true)
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('products')
       .select('*')
       .eq('sku_15_digits', sku)
@@ -45,13 +46,12 @@ export default function ScanPage() {
     if (data) {
       setProduct(data)
     } else {
-      alert('ไม่พบข้อมูลสินค้าชิ้นนี้ในระบบ: ' + sku)
+      alert('ไม่พบรหัสสินค้า: ' + sku)
       setScannedData(null)
     }
     setLoading(false)
   }
 
-  // ฟังก์ชันอัปเดตสต๊อก (+/-)
   const updateStock = async (amount: number) => {
     const newStock = product.current_stock + amount
     if (newStock < 0) return
@@ -63,7 +63,6 @@ export default function ScanPage() {
 
     if (!error) {
       setProduct({ ...product, current_stock: newStock })
-      // บันทึก Transaction (Phase 3) สามารถเพิ่มตรงนี้ได้
     }
   }
 
@@ -74,7 +73,6 @@ export default function ScanPage() {
         สแกน QR Code สินค้า
       </h1>
 
-      {/* ส่วนของกล้องสแกน */}
       {!scannedData && (
         <div className="space-y-4">
           <div id="reader" className="overflow-hidden rounded-2xl border-0 shadow-lg bg-black"></div>
@@ -97,7 +95,6 @@ export default function ScanPage() {
         </div>
       )}
 
-      {/* เมื่อสแกนติดแล้ว จะโชว์ข้อมูลสินค้า */}
       {loading && <div className="text-center p-10 font-bold">กำลังค้นหา...</div>}
 
       {scannedData && product && !loading && (
@@ -129,7 +126,6 @@ export default function ScanPage() {
             <span className="text-6xl font-black">{product.current_stock}</span>
           </div>
 
-          {/* ปุ่มเพิ่มลดสต๊อก */}
           <div className="grid grid-cols-2 gap-4 mt-6">
             <button 
               onClick={() => updateStock(-1)}
@@ -146,7 +142,7 @@ export default function ScanPage() {
           </div>
 
           <button 
-            onClick={() => { setScannedData(null); setProduct(null); window.location.reload(); }}
+            onClick={() => { window.location.reload(); }}
             className="w-full mt-6 text-gray-400 text-sm font-medium hover:text-gray-600 underline"
           >
             สแกนชิ้นต่อไป
