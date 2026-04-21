@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import * as XLSX from 'xlsx' // ตัวนี้จะทำงานได้เพราะเราแก้ package.json ใน Step 1
 
 export default function AddProductPage() {
   const router = useRouter()
@@ -11,141 +12,117 @@ export default function AddProductPage() {
   const [length, setLength] = useState('')
   const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
-  const [currentStock, setCurrentStock] = useState('0') // เพิ่มสถานะจำนวนสต๊อกเริ่มต้น
+  const [currentStock, setCurrentStock] = useState('0')
   const [receiveDate, setReceiveDate] = useState('') 
   const [unit, setUnit] = useState('Kg')
   const [skuPreview, setSkuPreview] = useState('')
+  const [isImporting, setIsImporting] = useState(false)
+
+  // ฟังก์ชันคำนวณ SKU 15 หลัก
+  const generateSKU = (pre: string, w: any, l: any, h: any, date: string) => {
+    const formatDim = (val: any) => {
+      const clean = val.toString().replace('.', '') 
+      return clean.substring(0, 2).padStart(2, '0')
+    }
+    const base = `${pre.toUpperCase()}${formatDim(w)}${formatDim(l)}${formatDim(h)}${date}`
+    return base.padEnd(15, 'x')
+  }
 
   useEffect(() => {
     if (prefix.length >= 2 && width && length && height && receiveDate.length === 6) {
-      const formatDim = (val: string) => {
-        const clean = val.replace('.', '') 
-        return clean.substring(0, 2).padStart(2, '0')
-      }
-      const wPart = formatDim(width)
-      const lPart = formatDim(length)
-      const hPart = formatDim(height)
-      const datePart = receiveDate 
-
-      const baseSku = `${prefix.toUpperCase()}${wPart}${lPart}${hPart}${datePart}`
-      const finalSku = baseSku.padEnd(15, 'x')
-      setSkuPreview(finalSku)
-    } else {
-      setSkuPreview('รอข้อมูลครบ...')
+      setSkuPreview(generateSKU(prefix, width, length, height, receiveDate))
     }
   }, [prefix, width, length, height, receiveDate])
 
+  // ระบบ Import ไฟล์ Excel
+  const handleFileUpload = (e: any) => {
+    const file = e.target.files[0]
+    if (!file) return
+    setIsImporting(true)
+
+    const reader = new FileReader()
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target?.result
+        const wb = XLSX.read(bstr, { type: 'binary' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        const jsonData: any[] = XLSX.utils.sheet_to_json(ws)
+
+        const productsToInsert = jsonData.map(row => ({
+          name: row["ชื่อสินค้า"],
+          prefix: row["ตัวย่อ (2-3 หลัก)"].toString().toUpperCase(),
+          sku_15_digits: generateSKU(row["ตัวย่อ (2-3 หลัก)"], row["กว้าง (cm)"], row["ยาว (cm)"], row["สูง (cm)"], row["วันที่รับ (YYMMDD)"].toString()),
+          width: parseFloat(row["กว้าง (cm)"]),
+          length: parseFloat(row["ยาว (cm)"]),
+          height: parseFloat(row["สูง (cm)"]),
+          weight: parseFloat(row["น้ำหนัก (kg)"]) || 0,
+          current_stock: parseInt(row["สต๊อกเริ่มต้น"]) || 0,
+          receive_date_text: row["วันที่รับ (YYMMDD)"].toString(),
+          unit: row["หน่วยนับ"]
+        }))
+
+        const { error } = await supabase.from('products').insert(productsToInsert)
+        if (error) throw error
+        alert(`นำเข้าสำเร็จ ${productsToInsert.length} รายการ!`)
+        router.push('/dashboard')
+      } catch (err: any) {
+        alert("เกิดข้อผิดพลาดในการ Import: " + err.message)
+      } finally {
+        setIsImporting(false)
+      }
+    }
+    reader.readAsBinaryString(file)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (receiveDate.length !== 6) {
-      alert('กรุณากรอกวันที่ให้ครบ 6 หลัก (YYMMDD)')
-      return
-    }
-
     const { error } = await supabase.from('products').insert([{
-      name,
-      prefix: prefix.toUpperCase(),
-      sku_15_digits: skuPreview,
-      width: parseFloat(width),
-      length: parseFloat(length),
-      height: parseFloat(height),
-      weight: parseFloat(weight) || 0,
-      receive_date_text: receiveDate,
-      unit,
-      current_stock: parseInt(currentStock) || 0 // ส่งจำนวนที่กรอกไปยังฐานข้อมูล
+      name, prefix: prefix.toUpperCase(), sku_15_digits: skuPreview,
+      width: parseFloat(width), length: parseFloat(length), height: parseFloat(height),
+      weight: parseFloat(weight) || 0, receive_date_text: receiveDate, unit,
+      current_stock: parseInt(currentStock) || 0
     }])
-
-    if (!error) {
-      alert('เพิ่มสินค้าสำเร็จ! รหัสคือ: ' + skuPreview)
-      router.push('/dashboard')
-    } else {
-      alert('Error: ' + error.message)
-    }
+    if (!error) { router.push('/dashboard') } else { alert(error.message) }
   }
 
   return (
     <div className="p-4 max-w-md mx-auto bg-gray-50 min-h-screen pb-10">
-      <div className="flex items-center gap-2 mb-6">
-        <button type="button" onClick={() => router.back()} className="text-gray-500 text-xl">←</button>
-        <h1 className="text-xl font-bold text-gray-800">เพิ่มสินค้าใหม่</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-xl font-bold text-gray-800">เพิ่มสินค้า</h1>
+        <label className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold cursor-pointer shadow-md">
+          {isImporting ? 'กำลังประมวลผล...' : 'Import Excel'}
+          <input type="file" className="hidden" accept=".xlsx, .xls" onChange={handleFileUpload} />
+        </label>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* กล่อง Preview รหัส 15 หลัก */}
-        <div className="p-5 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl shadow-lg text-white">
-          <label className="text-xs opacity-80 uppercase font-bold tracking-wider">รหัสสินค้าที่จะถูกสร้าง (15 หลัก)</label>
-          <div className="text-2xl font-mono font-bold mt-1 tracking-widest">{skuPreview}</div>
+        <div className="p-5 bg-blue-800 rounded-2xl shadow-lg text-white font-mono">
+          <label className="text-xs opacity-70 uppercase">Preview SKU</label>
+          <div className="text-2xl font-bold tracking-widest">{skuPreview || '---'}</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl shadow-sm space-y-4 border border-gray-100">
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">ชื่อสินค้า</label>
-            <input type="text" required className="w-full border-gray-200 border p-3 rounded-lg outline-none" 
-              value={name} onChange={(e) => setName(e.target.value)} placeholder="เช่น เหล็กแผ่นหนาพิเศษ" />
-          </div>
-
+          <input type="text" placeholder="ชื่อสินค้า" required className="w-full border p-3 rounded-lg" value={name} onChange={(e) => setName(e.target.value)} />
+          <input type="text" placeholder="ตัวย่อ (2-3 หลัก)" maxLength={3} required className="w-full border p-3 rounded-lg font-bold" value={prefix} onChange={(e) => setPrefix(e.target.value)} />
           <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-sm font-semibold text-gray-600 mb-1">ตัวย่อสินค้า (2-3 หลัก)</label>
-              <input type="text" maxLength={3} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-bold uppercase" 
-                value={prefix} onChange={(e) => setPrefix(e.target.value)} placeholder="STB" />
-            </div>
-            
-            {/* ขนาดและน้ำหนัก */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">กว้าง (cm)</label>
-              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={width} onChange={(e) => setWidth(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">ยาว (cm)</label>
-              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={length} onChange={(e) => setLength(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">สูง (cm)</label>
-              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={height} onChange={(e) => setHeight(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">น้ำหนัก (Kg)</label>
-              <input type="number" step="any" required className="w-full border-gray-200 border p-3 rounded-lg" 
-                value={weight} onChange={(e) => setWeight(e.target.value)} />
-            </div>
+            <input type="number" placeholder="กว้าง" step="any" className="border p-3 rounded-lg" value={width} onChange={(e) => setWidth(e.target.value)} />
+            <input type="number" placeholder="ยาว" step="any" className="border p-3 rounded-lg" value={length} onChange={(e) => setLength(e.target.value)} />
+            <input type="number" placeholder="สูง" step="any" className="border p-3 rounded-lg" value={height} onChange={(e) => setHeight(e.target.value)} />
+            <input type="number" placeholder="น้ำหนัก" step="any" className="border p-3 rounded-lg" value={weight} onChange={(e) => setWeight(e.target.value)} />
           </div>
-
-          <hr className="border-gray-100" />
-
-          {/* ส่วนของสต๊อกและวันที่ */}
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-bold text-green-700 mb-1">จำนวนสต๊อกเริ่มต้น</label>
-              <input type="number" required className="w-full border-green-200 border-2 p-3 rounded-lg bg-green-50 outline-none font-bold text-green-800" 
-                value={currentStock} onChange={(e) => setCurrentStock(e.target.value)} />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-gray-600 mb-1">หน่วยนับ</label>
-              <select className="w-full border-gray-200 border p-3 rounded-lg outline-none bg-white font-medium" 
-                value={unit} onChange={(e) => setUnit(e.target.value)}>
-                <option value="Kg">Kg</option>
-                <option value="แพ็ค">แพ็ค</option>
-                <option value="เส้น">เส้น</option>
-                <option value="แผ่น">แผ่น</option>
-                <option value="กล่อง">กล่อง</option>
-              </select>
-            </div>
+            <input type="number" placeholder="สต๊อกเริ่มต้น" className="border-2 border-green-200 p-3 rounded-lg bg-green-50" value={currentStock} onChange={(e) => setCurrentStock(e.target.value)} />
+            <select className="border p-3 rounded-lg bg-white" value={unit} onChange={(e) => setUnit(e.target.value)}>
+              <option value="Kg">Kg</option>
+              <option value="แพ็ค">แพ็ค</option>
+              <option value="เส้น">เส้น</option>
+              <option value="แผ่น">แผ่น</option>
+              <option value="กล่อง">กล่อง</option>
+            </select>
           </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-600 mb-1">วันที่รับสินค้า (YYMMDD)</label>
-            <input type="text" maxLength={6} required className="w-full border-gray-200 border p-3 rounded-lg outline-none font-mono" 
-              value={receiveDate} onChange={(e) => setReceiveDate(e.target.value.replace(/\D/g, ''))} placeholder="240606" />
-          </div>
+          <input type="text" placeholder="วันที่ (YYMMDD)" maxLength={6} className="w-full border p-3 rounded-lg font-mono" value={receiveDate} onChange={(e) => setReceiveDate(e.target.value.replace(/\D/g, ''))} />
         </div>
-
-        <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-md hover:bg-blue-700 transition-all active:scale-95">
-          บันทึกและเพิ่มเข้าสต๊อก
-        </button>
+        <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">บันทึกข้อมูล</button>
       </form>
     </div>
   )
