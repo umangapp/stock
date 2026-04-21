@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import Link from 'next/link'
-import { Plus, Package, LayoutDashboard, Edit2, RefreshCw } from 'lucide-react'
+import { Plus, Package, LayoutDashboard, Edit2, RefreshCw, AlertCircle } from 'lucide-react'
 
 export default function DashboardPage() {
   const [products, setProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -14,11 +15,20 @@ export default function DashboardPage() {
 
   const fetchProducts = async () => {
     setLoading(true)
-    const { data } = await supabase
+    setErrorMsg(null)
+    
+    // เปลี่ยนจาก created_at กลับเป็น id เพราะบางทีใน DB ยังไม่มีคอลัมน์วันที่สร้าง
+    const { data, error } = await supabase
       .from('products')
       .select('*')
-      .order('created_at', { ascending: false })
-    if (data) setProducts(data)
+      .order('id', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching:', error)
+      setErrorMsg(error.message)
+    } else {
+      setProducts(data || [])
+    }
     setLoading(false)
   }
 
@@ -42,12 +52,23 @@ export default function DashboardPage() {
         </Link>
       </div>
 
+      {/* Error Message */}
+      {errorMsg && (
+        <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 flex items-center gap-3 rounded-r-xl">
+          <AlertCircle size={20} />
+          <div>
+            <p className="font-bold">เกิดข้อผิดพลาดในการดึงข้อมูล</p>
+            <p className="text-sm">{errorMsg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Table Card */}
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
         <div className="p-4 border-b bg-gray-50 flex justify-between items-center">
           <h2 className="font-bold text-gray-700 flex items-center gap-2">
             <Package size={18} />
-            รายการสินค้าทั้งหมด
+            รายการสินค้าทั้งหมด ({products.length})
           </h2>
           <button onClick={fetchProducts} className="p-2 hover:bg-gray-200 rounded-full transition-colors text-blue-600">
             <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
@@ -68,7 +89,7 @@ export default function DashboardPage() {
               {loading && products.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-20 text-gray-400 font-medium">กำลังโหลดข้อมูล...</td></tr>
               ) : products.length === 0 ? (
-                <tr><td colSpan={4} className="text-center py-20 text-gray-400 font-medium">ไม่พบข้อมูลสินค้า</td></tr>
+                <tr><td colSpan={4} className="text-center py-20 text-gray-400 font-medium">ไม่พบข้อมูลสินค้าในฐานข้อมูล</td></tr>
               ) : (
                 products.map((item) => (
                   <tr key={item.id} className="hover:bg-blue-50/50 transition-colors group">
