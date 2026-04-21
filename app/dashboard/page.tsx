@@ -49,7 +49,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Low Stock Table [cite: 78, 94] */}
+      {/* Low Stock Table */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
         <h2 className="text-lg font-bold mb-4 flex items-center">
           <span className="w-3 h-3 bg-red-500 rounded-full mr-2"></span>
