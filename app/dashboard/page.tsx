@@ -131,7 +131,31 @@ export default function AdminDashboard() {
         </div>
         <button onClick={handleLogout} className="flex items-center gap-4 px-6 py-4 rounded-[1.8rem] text-sm font-bold text-red-400 hover:bg-red-500/10 mt-auto"><LogOut size={20} /> ออกจากระบบ</button>
       </nav>
-
+// ในส่วนของ Sidebar (nav)
+<div className="flex lg:flex-col flex-1 gap-2">
+  {[
+    { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
+    { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
+    // เพิ่มบรรทัดนี้ครับ 👇
+    { id: 'go_to_scan', label: 'เครื่องสแกนสินค้า', icon: QrCode }, 
+    { id: 'history', label: 'รายงาน', icon: ClipboardList },
+    { id: 'users', label: 'ผู้ใช้งาน', icon: Users },
+  ].map((item) => (
+    <button 
+      key={item.id} 
+      onClick={() => {
+        if (item.id === 'go_to_scan') {
+          router.push('/scan'); // ถ้ากดอันนี้ให้ไปหน้าสแกน
+        } else {
+          setActiveTab(item.id);
+        }
+      }} 
+      className={`flex items-center gap-4 px-6 py-4 rounded-[1.8rem] text-sm font-bold transition-all shrink-0 ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' : 'text-slate-400 hover:bg-white/5'}`}
+    >
+      <item.icon size={20} /> {item.label}
+    </button>
+  ))}
+</div>
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         {/* TAB: INVENTORY */}
         {activeTab === 'inventory' && (
