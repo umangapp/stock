@@ -18,7 +18,7 @@ export default function AdminDashboard() {
   const [isClient, setIsClient] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
-  const [expandedUsers, setExpandedUsers] = useState<string[]>([]) // สำหรับ Drill-down User
+  const [expandedUsers, setExpandedUsers] = useState<string[]>([])
 
   // Modal States
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -57,22 +57,42 @@ export default function AdminDashboard() {
     fetchData();
   }, [])
 
-  // --- ฟังก์ชันสร้าง SKU (กว้าง/ยาวเต็ม, สูง 2 หลักแรก, วันที่, x padding) ---
+  // --- 1. ฟังก์ชันสร้าง SKU (กว้าง/ยาวเต็ม, สูง 2 หลักแรก, เติม x) ---
   const generateSKU = (p: any) => {
     if (!p) return 'ERROR';
-    const pre = (p.prefix || '').toUpperCase();
-    const w = String(p.width || '');
-    const l = String(p.length || '');
-    const h = String(p.height || '').slice(0, 2);
-    const dt = String(p.received_date || '').replace(/\s/g, '').slice(0, 6);
+    const pre = (p.prefix || '').toUpperCase().slice(0, 3);
+    const w = String(p.width || '');           // กว้าง (เอาทั้งหมด)
+    const l = String(p.length || '');          // ยาว (เอาทั้งหมด)
+    const h = String(p.height || '').slice(0, 2); // สูง (เอาแค่ 2 หลักแรก)
+    const dt = String(p.received_date || '').replace(/\s/g, '').slice(0, 6); // วันที่ 6 หลัก
     
     const raw = pre + w + l + h + dt;
     return raw.padEnd(15, 'x').slice(0, 15);
   }
 
-  // --- จัดกลุ่มธุรกรรมตาม User ---
+  // --- 2. ฟังก์ชันเพิ่มสินค้าใหม่ (handleAddManual) ---
+  const handleAddManual = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const sku = generateSKU(newProduct);
+    const { error } = await supabase.from('products').insert([{
+      ...newProduct,
+      sku_15_digits: sku,
+      current_stock: Number(newProduct.current_stock)
+    }]);
+    
+    if (error) {
+      alert("❌ เพิ่มไม่สำเร็จ: " + error.message);
+    } else {
+      alert("✅ เพิ่มสำเร็จ!\nSKU: " + sku);
+      setIsAddModalOpen(false);
+      setNewProduct({ name: '', prefix: '', width: '', length: '', height: '', received_date: '', unit: 'เส้น', current_stock: 0 });
+      fetchData();
+    }
+  };
+
+  // --- 3. จัดกลุ่มธุรกรรมตาม User ---
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
-    const userName = t.created_by || 'Unknown';
+    const userName = t.created_by || 'Unknown User';
     if (!acc[userName]) acc[userName] = [];
     acc[userName].push(t);
     return acc;
@@ -96,7 +116,11 @@ export default function AdminDashboard() {
             { id: 'history', label: 'รายงานย้อนหลัง', icon: ClipboardList },
             { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users },
           ].map((item) => (
-            <button key={item.id} onClick={() => item.id === 'go_to_scan' ? router.push('/scan') : setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-[1.8rem] text-sm font-bold transition-all shrink-0 ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' : 'text-slate-400 hover:bg-white/5'}`}>
+            <button 
+              key={item.id} 
+              onClick={() => item.id === 'go_to_scan' ? router.push('/scan') : setActiveTab(item.id)} 
+              className={`flex items-center gap-4 px-6 py-4 rounded-[1.8rem] text-sm font-bold transition-all shrink-0 ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-500/30' : 'text-slate-400 hover:bg-white/5'}`}
+            >
               <item.icon size={20} /> {item.label}
             </button>
           ))}
@@ -107,12 +131,12 @@ export default function AdminDashboard() {
       {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         
-        {/* --- TAB: DASHBOARD (จัดกลุ่มตาม USER + 3 COLUMN) --- */}
+        {/* --- TAB: DASHBOARD (3-Column Drill-down) --- */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <header>
-              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">Live Activity Feed</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase mt-2">จัดกลุ่มตามผู้ใช้งาน (3-Column Drill-down)</p>
+              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">Live Activity Feed</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase mt-2 tracking-widest">จัดกลุ่มตามพนักงานผู้บันทึกข้อมูล</p>
             </header>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -129,20 +153,20 @@ export default function AdminDashboard() {
                       </div>
                       <div>
                         <h4 className="font-black text-xl uppercase tracking-tight leading-none">{userName}</h4>
-                        <p className="text-[10px] font-bold text-blue-400 uppercase mt-1 tracking-widest">{logs.length} รายการวันนี้</p>
+                        <p className="text-[10px] font-bold text-blue-400 uppercase mt-1 tracking-widest">{logs.length} รายการ</p>
                       </div>
                     </div>
                     {expandedUsers.includes(userName) ? <ChevronUp size={24}/> : <ChevronDown size={24}/>}
                   </div>
 
-                  {/* Drill-down Content (Activity Logs) */}
+                  {/* Drill-down Activity Logs */}
                   {expandedUsers.includes(userName) && (
-                    <div className="p-4 bg-slate-100 space-y-4 max-h-[600px] overflow-y-auto">
+                    <div className="p-4 bg-slate-100 space-y-4 max-h-[500px] overflow-y-auto">
                       {logs.map((log: any) => (
                         <div key={log.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4">
                           <div className="flex justify-between items-start">
                             <div className="space-y-1">
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ชื่อสินค้า</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">สินค้า</p>
                               <p className="text-2xl font-black text-slate-900 uppercase leading-none">{log.products?.name}</p>
                             </div>
                             <span className={`text-4xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
@@ -156,7 +180,7 @@ export default function AdminDashboard() {
                             {/* SKU ตัวใหญ่หนา */}
                             <div>
                               <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-1">รหัสสินค้า (SKU)</p>
-                              <p className="text-2xl font-mono font-black text-blue-700 tracking-widest uppercase bg-blue-50 p-2 rounded-xl border border-blue-100">
+                              <p className="text-2xl font-mono font-black text-blue-700 tracking-widest uppercase bg-blue-50 p-3 rounded-xl border border-blue-100">
                                 {log.products?.sku_15_digits}
                               </p>
                             </div>
@@ -164,16 +188,16 @@ export default function AdminDashboard() {
                             {/* วันที่และเวลา ตัวใหญ่หนา */}
                             <div className="grid grid-cols-2 gap-2">
                               <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">วันที่อัปเดต</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1 italic">Date</p>
                                 <p className="text-lg font-black text-slate-800 tracking-tighter">
-                                  {new Date(log.created_at).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                                  {new Date(log.created_at).toLocaleDateString('th-TH')}
                                 </p>
                               </div>
                               <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-right">
-                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1">เวลา</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase mb-1 italic">Time</p>
                                 <p className="text-lg font-black text-slate-800 tracking-tighter flex items-center justify-end gap-1">
                                   <Clock size={16} className="text-blue-500" />
-                                  {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                  {new Date(log.created_at).toLocaleTimeString('th-TH')}
                                 </p>
                               </div>
                             </div>
@@ -185,25 +209,19 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
-            
-            {transactions.length === 0 && (
-              <div className="text-center py-40 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
-                <p className="text-slate-400 font-black uppercase tracking-widest italic">ยังไม่มีความเคลื่อนไหวในระบบ</p>
-              </div>
-            )}
           </div>
         )}
 
-        {/* --- TAB: INVENTORY (เหมือนเดิม) --- */}
+        {/* --- TAB: INVENTORY --- */}
         {activeTab === 'inventory' && (
           <div className="space-y-8 animate-in fade-in">
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-              <div><h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">คลังสินค้า</h2><p className="text-[10px] text-slate-400 font-bold uppercase mt-2">จัดการสต๊อกสินค้า (mm.)</p></div>
+              <div><h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">คลังสินค้า</h2><p className="text-[10px] text-slate-400 font-bold uppercase mt-2 italic tracking-widest">Inventory Management (mm.)</p></div>
               <div className="flex flex-wrap gap-2 w-full md:w-auto">
-                <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 text-white px-6 py-4 rounded-[1.5rem] font-black uppercase text-[10px] flex items-center gap-2 shadow-lg"><Plus size={16}/> เพิ่มสินค้า</button>
+                <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 text-white px-6 py-4 rounded-[1.5rem] font-black uppercase text-[10px] flex items-center gap-2 shadow-lg hover:bg-blue-700 transition-all"><Plus size={16}/> เพิ่มสินค้า</button>
                 <div className="relative flex-1 md:w-64">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input type="text" placeholder="ค้นหา..." className="w-full pl-12 pr-4 py-4 bg-white rounded-[1.5rem] border border-slate-200 shadow-sm outline-none text-sm font-bold" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                  <input type="text" placeholder="ค้นหาชื่อสินค้า..." className="w-full pl-12 pr-4 py-4 bg-white rounded-[1.5rem] border border-slate-200 shadow-sm outline-none text-sm font-bold" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -215,9 +233,9 @@ export default function AdminDashboard() {
                 acc[item.name].items.push(item);
                 return acc;
               }, {})).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
-                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit">
+                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400">
                   <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 transition-all flex justify-between items-center text-slate-800">
-                    <div><h3 className="font-black uppercase text-lg leading-tight truncate w-32">{group.name}</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1">Total {group.items.length} SKU</p></div>
+                    <div><h3 className="font-black uppercase text-lg leading-tight truncate w-32">{group.name}</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic">Total {group.items.length} SKU</p></div>
                     <div className="text-right"><p className="text-3xl font-black">{group.totalStock}</p><p className="text-[9px] font-black uppercase text-slate-400">{group.unit}</p></div>
                   </div>
                   {expandedGroups.includes(group.name) && (
@@ -225,7 +243,7 @@ export default function AdminDashboard() {
                       {group.items.map((item: any) => (
                         <div key={item.id} className="bg-white p-5 rounded-[2rem] border border-slate-200 flex justify-between items-center shadow-sm text-slate-800">
                           <div><p className="text-[10px] font-mono font-black text-blue-600 tracking-tighter">{item.sku_15_digits}</p><p className="font-black text-xl">{item.current_stock} <span className="text-xs opacity-50">{item.unit}</span></p></div>
-                          <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Edit3 size={16}/></button>
+                          <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Edit3 size={16}/></button>
                         </div>
                       ))}
                     </div>
@@ -237,33 +255,44 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- MODAL (Add/Edit) --- */}
+      {/* --- MODAL (Add / Edit) --- */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-8"><h3 className="text-2xl font-black italic uppercase text-slate-800">{isAddModalOpen ? 'เพิ่มสินค้าใหม่' : 'แก้ไขข้อมูล'}</h3><button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-50 rounded-full text-slate-800"><X/></button></div>
+            <div className="flex justify-between items-center mb-8">
+              <h3 className="text-2xl font-black italic uppercase text-slate-800">{isAddModalOpen ? 'เพิ่มสินค้าใหม่' : 'แก้ไขข้อมูล'}</h3>
+              <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-50 rounded-full text-slate-800"><X/></button>
+            </div>
+            
             <form onSubmit={isAddModalOpen ? handleAddManual : async (e) => {
               e.preventDefault();
               const sku = generateSKU(editingProduct);
               const { error } = await supabase.from('products').update({ ...editingProduct, sku_15_digits: sku }).eq('id', editingProduct.id);
               if (!error) { alert("✅ บันทึกสำเร็จ"); setIsEditModalOpen(false); fetchData(); }
-            }} className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-slate-800">
+              else { alert("❌ เกิดข้อผิดพลาด: " + error.message); }
+            }} className="space-y-6 text-slate-800">
+              
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="col-span-full"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">ชื่อสินค้าหลัก</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, name: e.target.value}) : setEditingProduct({...editingProduct, name: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">ตัวย่อ (Prefix)</label><input type="text" required maxLength={3} className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-black text-blue-600 uppercase" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, prefix: e.target.value}) : setEditingProduct({...editingProduct, prefix: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">กว้าง (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">ยาว (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">สูง (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold text-orange-600" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic text-orange-500 underline">สูง (mm)</label><input type="number" required className="w-full bg-orange-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">หน่วยนับ</label><select className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold cursor-pointer" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{unitOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                <div className="bg-blue-50 rounded-2xl p-4"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกปัจจุบัน</label><input type="number" required className="w-full bg-transparent outline-none font-black text-xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
+                <div className="bg-blue-50 rounded-2xl p-4 shadow-inner"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกปัจจุบัน</label><input type="number" required className="w-full bg-transparent outline-none font-black text-xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
               </div>
 
-              <div className="bg-slate-900 p-6 rounded-[2rem] text-center border-2 border-blue-500/30 shadow-2xl">
-                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">SKU 15 Digits Preview</p>
-                 <p className="text-2xl font-mono font-black text-blue-400 tracking-widest uppercase">{generateSKU(isAddModalOpen ? newProduct : editingProduct)}</p>
+              <div className="bg-slate-900 p-8 rounded-[2rem] text-center border-2 border-blue-500/30 shadow-2xl">
+                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 italic">Preview SKU 15 Digits (G/Y เต็ม, ส 2 หลักแรก, x Padding)</p>
+                 <p className="text-3xl font-mono font-black text-blue-400 tracking-widest uppercase">
+                    {generateSKU(isAddModalOpen ? newProduct : editingProduct)}
+                 </p>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black shadow-xl uppercase tracking-tighter italic">บันทึกข้อมูลสินค้า</button>
+
+              <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black shadow-xl uppercase tracking-tighter italic hover:bg-blue-700 active:scale-95 transition-all">
+                {isAddModalOpen ? 'ยืนยันเพิ่มสินค้าใหม่' : 'บันทึกการแก้ไขสเปก'}
+              </button>
             </form>
           </div>
         </div>
