@@ -13,19 +13,28 @@ export default function LoginPage() {
 const handleLogin = async (e: React.FormEvent) => {
   e.preventDefault()
   setLoading(true)
-  alert("1. เริ่มส่งข้อมูลไป Supabase...");
 
   try {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     
     if (error) {
-      alert("2. เจอ Error: " + error.message);
-    } else {
-      alert("3. Login สำเร็จ! กำลังจะไปหน้าสแกน...");
-      router.push('/scan')
+      alert("Error: " + error.message)
+    } else if (data.user) {
+      // เช็ก Role ทันทีหลังล็อกอิน
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      if (profile?.role === 'admin') {
+        window.location.href = '/dashboard' // Admin ไปหลังบ้าน
+      } else {
+        window.location.href = '/scan' // Staff ไปหน้าสแกน
+      }
     }
   } catch (err) {
-    alert("เกิดข้อผิดพลาด: " + JSON.stringify(err));
+    alert("เกิดข้อผิดพลาด")
   } finally {
     setLoading(false)
   }
