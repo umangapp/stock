@@ -7,12 +7,12 @@ export async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res })
   const { data: { session } } = await supabase.auth.getSession()
 
-  // 1. ถ้ายังไม่ได้ล็อคอิน และไม่ใช่หน้า Login ให้ดีดไปหน้า Login
+  // 1. ถ้ายังไม่ Login ให้ไปหน้า Login (ยกเว้นกำลังอยู่ที่หน้า login)
   if (!session && !req.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', req.url))
   }
 
-  // 2. ตรวจสอบสิทธิ์เฉพาะเวลาจะเข้าหน้า Dashboard (หลังบ้าน)
+  // 2. ถ้า Login แล้ว และจะเข้าหน้า Dashboard ให้เช็ก Role
   if (session && req.nextUrl.pathname.startsWith('/dashboard')) {
     const { data: profile } = await supabase
       .from('profiles')
@@ -20,8 +20,8 @@ export async function middleware(req: NextRequest) {
       .eq('id', session.user.id)
       .single()
 
-    // ถ้าไม่ใช่ admin ห้ามเข้าหน้าจัดการระบบ (ให้ไปหน้าสแกนแทน)
-    if (profile?.role !== 'admin') {
+    // ถ้าหา Role ไม่เจอ หรือไม่ใช่ admin ให้ไปหน้าสแกน
+    if (!profile || profile.role !== 'admin') {
       return NextResponse.redirect(new URL('/scan', req.url))
     }
   }
