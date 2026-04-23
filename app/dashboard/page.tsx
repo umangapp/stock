@@ -9,6 +9,7 @@ import {
 import * as XLSX from 'xlsx'
 
 export default function AdminDashboard() {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [products, setProducts] = useState<any[]>([])
   const [transactions, setTransactions] = useState<any[]>([])
