@@ -4,8 +4,8 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { 
   LayoutDashboard, ClipboardList, Users, Download, Package, 
-  Search, ChevronDown, ChevronUp, Edit3, X, Save, LogOut, Plus, Box
-} from 'lucide-react'
+  Search, ChevronDown, ChevronUp, Edit3, X, Save, LogOut, Plus, Box, QrCode
+} from 'lucide-react''
 import * as XLSX from 'xlsx'
 
 export default function AdminDashboard() {
