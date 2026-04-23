@@ -1,4 +1,8 @@
-// ในไฟล์ app/scan/page.tsx เพิ่มระบบ Auto Logout เหมือนกันครับ
+'use client'
+// แก้บรรทัดนี้ครับ เพิ่ม useCallback เข้าไป
+import { useEffect, useState, useCallback } from 'react' 
+import { supabase } from '@/lib/supabaseClient'
+// ... (import ตัวอื่นๆ เหมือนเดิม)
 
 // 1. เพิ่มฟังก์ชัน Logout ในหน้าสแกน
 const handleLogout = useCallback(async () => {
