@@ -73,13 +73,40 @@ export default function AdminDashboard() {
     fetchData()
   }, [startDate, endDate])
 
-  const fetchData = async () => {
+const fetchData = async () => {
     setLoading(true)
-    const { data: p } = await supabase.from('products').select('*').order('name')
-    const { data: t } = await supabase.from('transactions').select('*, products(name, unit)').gte('created_at', `${startDate}T00:00:00`).lte('created_at', `${endDate}T23:59:59`).order('created_at', { ascending: false })
-    const { data: u } = await supabase.from('profiles').select('*').order('role')
-    if (p && t) { setProducts(p); setTransactions(t); if (u) setProfiles(u); }
-    setLoading(false)
+    try {
+      // 1. ดึงข้อมูลสินค้า (ตรวจสอบว่า p มีข้อมูลไหม)
+      const { data: p, error: pError } = await supabase.from('products').select('*').order('name')
+      if (pError) console.error("Product Error:", pError.message)
+
+      // 2. ดึงข้อมูลธุรกรรม (ลองถอดตัวกรองวันที่ออกก่อน เพื่อดูว่ามีข้อมูลไหม)
+      // ถ้าอยากให้กรองวันที่เหมือนเดิม ให้ใช้บรรทัดที่มี .gte และ .lte ครับ
+      const { data: t, error: tError } = await supabase
+        .from('transactions')
+        .select('*, products(name, unit)')
+        .order('created_at', { ascending: false })
+      
+      if (tError) console.error("Transaction Error:", tError.message)
+
+      // 3. ดึงข้อมูลโปรไฟล์พนักงาน
+      const { data: u, error: uError } = await supabase.from('profiles').select('*').order('role')
+      if (uError) console.error("Profile Error:", uError.message)
+
+      // ตรวจสอบและอัปเดต State
+      if (p) setProducts(p)
+      if (t) setTransactions(t)
+      if (u) setProfiles(u)
+
+      // ลองเช็กใน Console (F12) ว่าข้อมูลมาไหม
+      console.log("Fetched Products:", p?.length)
+      console.log("Fetched Transactions:", t?.length)
+
+    } catch (err) {
+      console.error("System Error:", err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
