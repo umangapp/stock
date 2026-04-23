@@ -38,11 +38,13 @@ export default function AdminDashboard() {
     window.location.href = '/login';
   }, [])
 
-  // --- ฟังก์ชันดึงข้อมูลแบบ Global ---
+  // --- ฟังก์ชันดึงข้อมูล (เพิ่มการดึง sku_15_digits มาโชว์ที่ Feed) ---
   const fetchData = async () => {
     setLoading(true)
     const { data: p } = await supabase.from('products').select('*').order('name')
-    const { data: t } = await supabase.from('transactions').select('*, products(name, unit)').order('created_at', { ascending: false })
+    const { data: t } = await supabase.from('transactions')
+      .select('*, products(name, unit, sku_15_digits)') // ดึงรหัสสินค้ามาด้วย
+      .order('created_at', { ascending: false })
     const { data: u } = await supabase.from('profiles').select('*').order('role')
     
     if (p) setProducts(p)
@@ -56,50 +58,17 @@ export default function AdminDashboard() {
     fetchData();
   }, [])
 
-  // --- 1. ฟังก์ชันสร้าง SKU (สูตรใหม่ล่าสุด) ---
+  // --- ฟังก์ชันสร้าง SKU (กฎล่าสุด: กว้าง/ยาวไม่ตัด 0, สูงเอา 2 หลักแรก, เติม x) ---
   const generateSKU = (p: any) => {
     if (!p) return 'ERROR';
-    const pre = (p.prefix || '').toUpperCase(); // Prefix ตามจริง
-    const w = String(p.width || '');           // กว้าง (เอาทั้งหมด ไม่ตัด 0)
-    const l = String(p.length || '');          // ยาว (เอาทั้งหมด ไม่ตัด 0)
-    const h = String(p.height || '').slice(0, 2); // สูง (เอาแค่ 2 หลักแรก)
-    const dt = String(p.received_date || '').replace(/\s/g, '').slice(0, 6); // วันที่ 6 หลัก
+    const pre = (p.prefix || '').toUpperCase();
+    const w = String(p.width || '');
+    const l = String(p.length || '');
+    const h = String(p.height || '').slice(0, 2);
+    const dt = String(p.received_date || '').replace(/\s/g, '').slice(0, 6);
     
     const raw = pre + w + l + h + dt;
-    return raw.padEnd(15, 'x').slice(0, 15); // เติม x ให้ครบ 15 หลัก
-  }
-
-  // --- 2. ระบบ Import จาก Excel ---
-  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      try {
-        const wb = XLSX.read(evt.target?.result, { type: 'binary' });
-        const data: any[] = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        const formatted = data.map(item => {
-          const specs = {
-            prefix: item['ตัวย่อ (2-3 หลัก)'],
-            width: item['กว้าง (mm)'],
-            length: item['ยาว (mm)'],
-            height: item['สูง (mm)'],
-            received_date: item['วันที่รับ (YYMMDD)']
-          };
-          return {
-            name: item['ชื่อสินค้า'],
-            sku_15_digits: generateSKU(specs),
-            unit: item['หน่วยนับ'] || 'เส้น',
-            current_stock: Number(item['สต๊อกเริ่มต้น']) || 0,
-            prefix: specs.prefix, width: specs.width, length: specs.length, height: specs.height, received_date: specs.received_date
-          }
-        });
-        const { error } = await supabase.from('products').insert(formatted);
-        if (error) alert("❌ บันทึกไม่สำเร็จ: " + error.message);
-        else { alert("✅ นำเข้าสำเร็จ!"); fetchData(); }
-      } catch (err) { alert("❌ ไฟล์ไม่ถูกต้อง"); }
-    };
-    reader.readAsBinaryString(file);
+    return raw.padEnd(15, 'x').slice(0, 15);
   }
 
   const handleAddManual = async (e: React.FormEvent) => {
@@ -157,9 +126,10 @@ export default function AdminDashboard() {
         <button onClick={handleLogout} className="flex items-center gap-4 px-6 py-4 rounded-[1.8rem] text-sm font-bold text-red-400 hover:bg-red-500/10 mt-auto"><LogOut size={20} /> ออกจากระบบ</button>
       </nav>
 
+      {/* MAIN CONTENT */}
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         
-        {/* DASHBOARD TAB */}
+        {/* TAB: DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -169,17 +139,38 @@ export default function AdminDashboard() {
               </div>
               <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center gap-5 text-slate-800">
                 <div className="p-5 bg-green-50 text-green-600 rounded-[1.5rem]"><TrendingUp size={28}/></div>
-                <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1">ธุรกรรมวันนี้</p><p className="text-4xl font-black">{transactions.filter(t => t.created_at.startsWith(todayStr)).length}</p></div>
+                <div><p className="text-[10px] font-black text-slate-400 uppercase mb-1">ธุรกรรมทั้งหมด</p><p className="text-4xl font-black">{transactions.length}</p></div>
               </div>
             </div>
 
+            {/* LIVE ACTIVITY FEED (ปรับแก้การแสดงผลที่นี่) */}
             <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-8 border-b border-slate-50 font-black text-slate-800 uppercase text-xs tracking-widest bg-slate-50/30 italic">Live Activity Feed</div>
+                <div className="p-8 border-b border-slate-50 font-black text-slate-800 uppercase text-sm tracking-widest bg-slate-50/30 italic">Live Activity Feed</div>
                 <div className="p-6 space-y-4">
-                    {transactions.slice(0, 10).map((log: any) => (
-                        <div key={log.id} className="bg-white p-5 rounded-[1.8rem] flex justify-between items-center shadow-sm border border-slate-50 text-slate-800">
-                            <div><p className="text-lg font-black uppercase leading-tight">{log.products?.name}</p><p className="text-[9px] text-slate-400 font-bold">{new Date(log.created_at).toLocaleString('th-TH')} | โดย {log.created_by}</p></div>
-                            <span className={`text-2xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
+                    {transactions.length === 0 ? <p className="text-center py-10 text-slate-300 font-bold uppercase text-xs">ยังไม่มีความเคลื่อนไหว</p> : 
+                    transactions.slice(0, 15).map((log: any) => (
+                        <div key={log.id} className="bg-white p-6 rounded-[2rem] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-sm border border-slate-50 text-slate-800 hover:border-blue-200 transition-all">
+                            <div className="flex-1 space-y-1">
+                                <p className="text-xl font-black uppercase leading-tight tracking-tight text-slate-900">{log.products?.name}</p>
+                                {/* แสดง SKU ตัวใหญ่หนา */}
+                                <p className="text-lg font-mono font-black text-blue-600 tracking-wider">
+                                    SKU: {log.products?.sku_15_digits || 'N/A'}
+                                </p>
+                                {/* แสดงวันที่ เวลา และชื่อคนแก้ แบบตัวใหญ่ขึ้น */}
+                                <p className="text-sm font-bold text-slate-500 uppercase">
+                                    <span className="text-slate-900">{new Date(log.created_at).toLocaleDateString('th-TH')}</span>
+                                    <span className="mx-2">|</span>
+                                    <span className="text-slate-900">{new Date(log.created_at).toLocaleTimeString('th-TH')}</span>
+                                    <span className="mx-2">|</span>
+                                    โดย <span className="text-blue-500 underline underline-offset-4">{log.created_by}</span>
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <span className={`text-4xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {log.type === 'receive' ? '+' : '-'} {log.amount}
+                                </span>
+                                <span className="text-xs font-bold text-slate-400 uppercase">{log.products?.unit}</span>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -187,20 +178,16 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* INVENTORY TAB */}
+        {/* --- INVENTORY TAB (เหมือนเดิม) --- */}
         {activeTab === 'inventory' && (
           <div className="space-y-8 animate-in fade-in">
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-              <div><h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">คลังสินค้า</h2><p className="text-[10px] text-slate-400 font-bold uppercase mt-2">จัดการตามกลุ่มสินค้า (mm.)</p></div>
+              <div><h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900 leading-none">คลังสินค้า</h2><p className="text-[10px] text-slate-400 font-bold uppercase mt-2">จัดการสเปกสินค้า (mm.)</p></div>
               <div className="flex flex-wrap gap-2 w-full md:w-auto">
                 <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 text-white px-6 py-4 rounded-[1.5rem] font-black uppercase text-[10px] flex items-center gap-2 shadow-lg"><Plus size={16}/> เพิ่มสินค้า</button>
-                <label className="cursor-pointer bg-green-600 text-white px-6 py-4 rounded-[1.5rem] font-black uppercase text-[10px] flex items-center gap-2 shadow-lg shadow-green-100">
-                  <Download size={16} className="rotate-180" /> Import Excel
-                  <input type="file" accept=".xlsx, .xls, .csv" className="hidden" onChange={handleImportExcel} />
-                </label>
                 <div className="relative flex-1 md:w-64">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                  <input type="text" placeholder="ค้นหา..." className="w-full pl-12 pr-4 py-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm outline-none text-sm font-bold" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+                  <input type="text" placeholder="ค้นหา..." className="w-full pl-12 pr-4 py-4 bg-white rounded-[1.5rem] border border-slate-100 shadow-sm outline-none text-sm font-bold font-sans" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 </div>
               </div>
             </div>
@@ -221,7 +208,7 @@ export default function AdminDashboard() {
                     <div className="p-4 bg-slate-50/50 space-y-3">
                       {group.items.map((item: any) => (
                         <div key={item.id} className="bg-white p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm text-slate-800">
-                          <div><p className="text-[10px] font-mono font-black text-blue-600 tracking-widest">{item.sku_15_digits}</p><p className="font-black text-xl">{item.current_stock} <span className="text-xs opacity-50">{item.unit}</span></p></div>
+                          <div><p className="text-[10px] font-mono font-black text-blue-600 tracking-tighter">{item.sku_15_digits}</p><p className="font-black text-xl">{item.current_stock} <span className="text-xs opacity-50">{item.unit}</span></p></div>
                           <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Edit3 size={16}/></button>
                         </div>
                       ))}
@@ -232,79 +219,30 @@ export default function AdminDashboard() {
             </div>
           </div>
         )}
-
-        {/* HISTORY TAB */}
-        {activeTab === 'history' && (
-          <div className="space-y-6 animate-in fade-in">
-             <div className="flex flex-wrap gap-4 bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 items-center">
-                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="bg-slate-50 p-3 rounded-2xl outline-none font-bold text-sm text-slate-800" />
-                <ArrowRightLeft className="text-slate-200" size={20} />
-                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="bg-slate-50 p-3 rounded-2xl outline-none font-bold text-sm text-slate-800" />
-             </div>
-             <div className="bg-white rounded-[3rem] overflow-hidden border border-slate-100 shadow-sm text-slate-800 text-sm">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 border-b">
-                    <tr><th className="px-8 py-6">สินค้า</th><th className="px-8 py-6">รับเข้า (+)</th><th className="px-8 py-6">นำออก (-)</th><th className="px-8 py-6">สุทธิ</th></tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {products.map((p) => {
-                        const itemLogs = transactions.filter(t => t.product_id === p.id && t.created_at >= startDate && t.created_at <= `${endDate}T23:59:59`);
-                        const received = itemLogs.filter(t => t.type === 'receive').reduce((sum, t) => sum + t.amount, 0);
-                        const issued = itemLogs.filter(t => t.type === 'issue').reduce((sum, t) => sum + t.amount, 0);
-                        if (received === 0 && issued === 0) return null;
-                        return (
-                          <tr key={p.id}>
-                            <td className="px-8 py-6 font-black uppercase">{p.name}</td>
-                            <td className="px-8 py-6 font-bold text-green-600">+{received}</td>
-                            <td className="px-8 py-6 font-bold text-red-600">-{issued}</td>
-                            <td className="px-8 py-6 font-black">{received - issued}</td>
-                          </tr>
-                        );
-                    })}
-                  </tbody>
-                </table>
-             </div>
-          </div>
-        )}
-
-        {/* USERS TAB */}
-        {activeTab === 'users' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
-            {profiles.map((u) => (
-              <div key={u.id} className="bg-white p-8 rounded-[3rem] shadow-sm border border-slate-100 text-slate-800">
-                <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-6 text-slate-400"><User size={24}/></div>
-                <h4 className="font-black text-xl uppercase leading-none">{u.full_name || 'STAFF'}</h4>
-                <p className="text-xs font-mono text-slate-400 mt-2 mb-6">{u.email}</p>
-                <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase ${u.role === 'admin' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>{u.role}</span>
-              </div>
-            ))}
-          </div>
-        )}
       </main>
 
-      {/* --- MODAL --- */}
+      {/* --- MODAL: ADD / EDIT --- */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl p-10 max-h-[90vh] overflow-y-auto font-sans">
             <div className="flex justify-between items-center mb-8"><h3 className="text-2xl font-black italic uppercase text-slate-800">{isAddModalOpen ? 'เพิ่มสินค้าใหม่' : 'แก้ไขข้อมูล'}</h3><button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-50 rounded-full text-slate-800"><X/></button></div>
-            
-            <form onSubmit={isAddModalOpen ? handleAddManual : handleUpdateProduct} className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-slate-800">
+            <form onSubmit={isAddModalOpen ? handleAddManual : handleUpdateProduct} className="space-y-6 text-slate-800">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="col-span-full"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">ชื่อสินค้าหลัก</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, name: e.target.value}) : setEditingProduct({...editingProduct, name: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">ตัวย่อ (Prefix)</label><input type="text" required maxLength={3} className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-black text-blue-600 uppercase" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, prefix: e.target.value}) : setEditingProduct({...editingProduct, prefix: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">กว้าง (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">ยาว (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">สูง (mm)</label><input type="number" required className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold text-orange-600" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">หน่วยนับ</label><select className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold cursor-pointer" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{unitOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
-                <div className="bg-blue-50 rounded-2xl p-4"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกปัจจุบัน</label><input type="number" required className="w-full bg-transparent outline-none font-black text-xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold font-sans" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2">หน่วยนับ</label><select className="w-full bg-slate-50 p-4 rounded-2xl outline-none font-bold cursor-pointer font-sans" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{unitOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select></div>
+                <div className="bg-blue-50 rounded-2xl p-4"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกปัจจุบัน</label><input type="number" required className="w-full bg-transparent outline-none font-black text-xl text-blue-600 font-sans" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
               </div>
 
               <div className="bg-slate-900 p-6 rounded-[2rem] text-center border-2 border-blue-500/30">
-                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic underline">SKU 15 Digits Preview (New Rule)</p>
+                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1 italic">SKU 15 Digits Preview</p>
                  <p className="text-2xl font-mono font-black text-blue-400 tracking-widest uppercase">{generateSKU(isAddModalOpen ? newProduct : editingProduct)}</p>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black shadow-xl uppercase tracking-tighter italic active:scale-95 transition-all">บันทึกข้อมูล</button>
+              <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-[2.5rem] font-black shadow-xl uppercase tracking-tighter italic">บันทึกข้อมูล</button>
             </form>
           </div>
         </div>
