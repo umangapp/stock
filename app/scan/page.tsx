@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Html5Qrcode } from 'html5-qrcode'
 import { generateSKU } from '@/lib/skuHelper'
 import { 
-  QrCode, LogOut, Clock, History, Calendar, X, Camera, Search, 
-  ArrowDownCircle, ArrowUpCircle, Plus, Minus, FileText, CheckCircle2
+  QrCode, Clock, History, Calendar, X, Camera, Search, 
+  ArrowDownCircle, ArrowUpCircle, Plus, Minus, FileText, CheckCircle2, AlertCircle
 } from 'lucide-react'
 
 export default function ScanPage() {
@@ -24,6 +24,7 @@ export default function ScanPage() {
 
   // Transaction Modal States
   const [showActionModal, setShowActionModal] = useState(false)
+  const [showSummaryModal, setShowSummaryModal] = useState(false) // 🌟 หน้าสรุป
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [amount, setAmount] = useState(1)
   const [note, setNote] = useState('')
@@ -37,7 +38,7 @@ export default function ScanPage() {
     setActiveName(currentName)
 
     const { data: logs } = await supabase.from('transactions')
-      .select('*, products(name, unit, sku_15_digits, width, height, length)')
+      .select('*, products(name, unit, sku_15_digits, width, height, length, current_stock)')
       .eq('created_by', currentName)
       .order('created_at', { ascending: false })
     
@@ -97,6 +98,7 @@ export default function ScanPage() {
     setShowActionModal(true)
   }
 
+  // --- 💾 บันทึกจริง (หลังจากผ่านหน้าสรุป) ---
   const handleSaveTransaction = async () => {
     if (!selectedProduct || amount <= 0) return
 
@@ -114,12 +116,11 @@ export default function ScanPage() {
     }])
 
     if (!updateErr && !logErr) {
-      alert(`✅ บันทึกสำเร็จ!\nคงเหลือ: ${newStock} ${selectedProduct.unit}`)
+      setShowSummaryModal(false)
       setShowActionModal(false)
+      alert(`✅ บันทึกสำเร็จ!\nยอดคงเหลือใหม่: ${newStock} ${selectedProduct.unit}`)
       fetchUserData()
       setScanInput('')
-    } else {
-      alert("เกิดข้อผิดพลาดในการบันทึก")
     }
   }
 
@@ -139,7 +140,7 @@ export default function ScanPage() {
       <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-[110]">
         <div className="flex items-center gap-3">
           <QrCode className="text-blue-500" />
-          <h1 className="text-xs font-black uppercase tracking-[0.2em] italic">Scan Center</h1>
+          <h1 className="text-xs font-black uppercase tracking-[0.2em] italic text-blue-400">Scan Center</h1>
         </div>
         <button onClick={() => setShowHistory(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
           ประวัติรายการ
@@ -150,16 +151,16 @@ export default function ScanPage() {
         {/* HISTORY OVERLAY */}
         {showHistory && (
           <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
-             <div className="max-w-md mx-auto space-y-6 pb-20">
+             <div className="max-w-md mx-auto space-y-6 pb-20 text-slate-900">
                 <div className="flex items-center justify-between mb-8">
                    <h3 className="text-2xl font-black italic uppercase text-blue-500">My Activity</h3>
-                   <button onClick={() => setShowHistory(false)} className="bg-white/10 p-2 rounded-full"><X/></button>
+                   <button onClick={() => setShowHistory(false)} className="bg-white/10 p-2 rounded-full text-white"><X/></button>
                 </div>
                 {Object.entries(groupedByDate).map(([date, logs]: [string, any]) => (
                   <div key={date} className="space-y-4">
                     <div className="text-[11px] font-black uppercase text-slate-500 tracking-widest border-l-2 border-blue-500 pl-3">{date}</div>
                     {logs.map((log: any) => (
-                      <div key={log.id} className="bg-white rounded-[1.5rem] p-5 flex flex-col gap-3 text-slate-900 shadow-xl">
+                      <div key={log.id} className="bg-white rounded-[1.5rem] p-5 flex flex-col gap-3 shadow-xl">
                         <div className="flex justify-between items-start">
                           <p className="font-black text-lg leading-none">{log.products?.name}</p>
                           <span className={`font-black text-2xl ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
@@ -193,15 +194,14 @@ export default function ScanPage() {
         </main>
       </div>
 
-      {/* --- 🛠 MODAL จัดการจำนวนสินค้า (แก้ไขแล้ว) --- */}
+      {/* --- 🛠 MODAL 1: จัดการจำนวน (โชว์สต๊อกปัจจุบัน) --- */}
       {showActionModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-end sm:items-center justify-center">
-          <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 text-slate-900 animate-in slide-in-from-bottom duration-300">
+          <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 text-slate-900 animate-in slide-in-from-bottom duration-300 shadow-2xl">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-black uppercase italic tracking-tighter leading-none">{selectedProduct.name}</h2>
-                {/* 🌟 แสดงขนาดสินค้า กว้าง x หนา x ยาว มม. */}
-                <p className="text-[12px] font-black text-slate-400 mt-2 uppercase tracking-widest">
+                <p className="text-[13px] font-black text-slate-400 mt-2 uppercase tracking-widest">
                   ขนาด: {selectedProduct.width} x {selectedProduct.height} x {selectedProduct.length} มม.
                 </p>
                 <p className="text-blue-600 font-mono font-bold mt-1 text-[12px]">{selectedProduct.sku_15_digits}</p>
@@ -210,53 +210,98 @@ export default function ScanPage() {
             </div>
 
             <div className="space-y-6">
-              {/* แถวที่ 1: ปุ่มลัด (แก้ไขให้บวกค่าเข้า amount เสมอ) */}
+              {/* ส่วนแสดงสต๊อกคงเหลือในระบบ */}
+              <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
+                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">สต๊อกคงเหลือในระบบ</span>
+                 <span className="text-xl font-black">{selectedProduct.current_stock} <span className="text-[10px] opacity-50">{selectedProduct.unit}</span></span>
+              </div>
+
+              {/* ปุ่มลัด 5 10 50 */}
               <div className="grid grid-cols-3 gap-3">
                 {[5, 10, 50].map(num => (
-                  <button 
-                    key={num} 
-                    onClick={() => setAmount(prev => prev + num)}
-                    className={`${scanMode === 'receive' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-red-50 text-red-600 border-red-200'} py-4 rounded-2xl font-black text-xl border-b-4 active:translate-y-1 active:border-b-0 transition-all`}
-                  >
+                  <button key={num} onClick={() => setAmount(prev => prev + num)} className={`${scanMode === 'receive' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-red-50 text-red-600 border-red-200'} py-4 rounded-2xl font-black text-xl border-b-4 active:translate-y-1 active:border-b-0 transition-all`}>
                     {scanMode === 'receive' ? '+' : '-'}{num}
                   </button>
                 ))}
               </div>
 
-              {/* แถวที่ 2: ปรับทีละ 1 และช่องใส่จำนวนที่คีย์เลขได้ */}
-              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl gap-2">
-                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-red-500"><Minus size={30} strokeWidth={3}/></button>
+              {/* ปรับทีละ 1 และคีย์เลขได้ */}
+              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl gap-2 border border-slate-200 shadow-inner">
+                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md ${scanMode === 'receive' ? 'text-slate-400' : 'text-red-500'}`}><Minus size={30} strokeWidth={3}/></button>
                 <div className="flex-1 text-center bg-white rounded-2xl p-2 shadow-sm">
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent"
-                  />
+                  <input type="number" value={amount} onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 0))} className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent" />
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{selectedProduct.unit}</p>
                 </div>
-                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-green-500"><Plus size={30} strokeWidth={3}/></button>
+                <button onClick={() => setAmount(prev => prev + 1)} className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md ${scanMode === 'receive' ? 'text-green-500' : 'text-slate-400'}`}><Plus size={30} strokeWidth={3}/></button>
               </div>
 
-              {/* ช่องหมายเหตุ */}
               <div className="relative">
-                <FileText className="absolute left-4 top-4 text-slate-300" size={20}/>
-                <textarea 
-                  placeholder="พิมพ์หมายเหตุ (ถ้ามี)..." 
-                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pl-12 text-sm font-bold outline-none focus:border-blue-500 h-20"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
+                <FileText className="absolute left-4 top-4 text-slate-300" size={20}/><textarea placeholder="หมายเหตุ (ถ้ามี)..." className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pl-12 text-sm font-bold outline-none h-20" value={note} onChange={(e) => setNote(e.target.value)}/>
               </div>
 
               <button 
-                onClick={handleSaveTransaction}
+                onClick={() => setShowSummaryModal(true)} // 🌟 กดยืนยันแล้วไปหน้าสรุป
                 className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter text-white shadow-xl transition-all active:scale-95 ${scanMode === 'receive' ? 'bg-green-600 shadow-green-200' : 'bg-red-600 shadow-red-200'}`}
               >
-                ยืนยัน{scanMode === 'receive' ? 'นำเข้า' : 'นำออก'} {amount} {selectedProduct.unit}
+                ยืนยัน{scanMode === 'receive' ? 'นำเข้า' : 'นำออก'}
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* --- 🌟 MODAL 2: สรุปรายการก่อนบันทึกจริง --- */}
+      {showSummaryModal && selectedProduct && (
+        <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-xl z-[400] flex items-center justify-center p-6">
+           <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-slate-900 shadow-2xl animate-in zoom-in duration-200">
+              <div className="flex flex-col items-center text-center mb-8">
+                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                    <AlertCircle size={40} />
+                 </div>
+                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">สรุปรายการ</h3>
+                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">กรุณาตรวจสอบความถูกต้อง</p>
+              </div>
+
+              <div className="space-y-4 mb-10">
+                 <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">สินค้า</span>
+                    <span className="font-bold text-sm">{selectedProduct.name}</span>
+                 </div>
+                 <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">รหัส SKU</span>
+                    <span className="font-mono font-black text-blue-600 text-[11px]">{selectedProduct.sku_15_digits}</span>
+                 </div>
+                 <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">ประเภท</span>
+                    <span className={`font-black text-sm uppercase ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                       {scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}
+                    </span>
+                 </div>
+                 <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase">จำนวน</span>
+                    <span className="font-black text-xl">{amount} {selectedProduct.unit}</span>
+                 </div>
+
+                 {/* สรุปยอดสต๊อกใหม่ */}
+                 <div className="bg-slate-50 p-4 rounded-2xl mt-4">
+                    <div className="flex justify-between text-xs font-bold">
+                       <span>สต๊อกเดิม:</span>
+                       <span>{selectedProduct.current_stock}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-black mt-2 pt-2 border-t border-slate-200">
+                       <span>ยอดคงเหลือใหม่:</span>
+                       <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>
+                          {scanMode === 'receive' ? selectedProduct.current_stock + amount : selectedProduct.current_stock - amount} {selectedProduct.unit}
+                       </span>
+                    </div>
+                 </div>
+              </div>
+
+              <div className="flex gap-3">
+                 <button onClick={() => setShowSummaryModal(false)} className="flex-1 bg-slate-100 py-4 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-[11px]">แก้ไข</button>
+                 <button onClick={handleSaveTransaction} className={`flex-[2] py-4 rounded-2xl font-black text-white shadow-lg ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>ยืนยันทำรายการ</button>
+              </div>
+           </div>
         </div>
       )}
 
@@ -265,7 +310,7 @@ export default function ScanPage() {
         <div className="fixed inset-0 bg-black z-[200] flex flex-col">
           <div className="flex justify-between items-center p-6 bg-slate-900 border-b border-white/5">
             <p className="font-black uppercase italic text-blue-400">Mode: {scanMode?.toUpperCase()}</p>
-            <button onClick={stopScanner} className="bg-red-50 text-red-600 p-2 rounded-full"><X/></button>
+            <button onClick={stopScanner} className="bg-red-50 text-white p-2 rounded-full"><X/></button>
           </div>
           <div id="reader" className="flex-1 bg-black"></div>
         </div>
