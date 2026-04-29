@@ -201,7 +201,7 @@ export default function ScanPage() {
         </main>
       </div>
 
-      {/* --- 🛠 แผงควบคุมจำนวนและโน้ต (MODAL กลับมาแล้ว) --- */}
+     {/* --- 🛠 แผงควบคุมจำนวนและโน้ต (MODAL ที่แก้ไขแล้ว) --- */}
       {showActionModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 text-slate-900 animate-in slide-in-from-bottom duration-300">
@@ -214,26 +214,40 @@ export default function ScanPage() {
             </div>
 
             <div className="space-y-6">
-              {/* แถวที่ 1: ปุ่มลัด 5, 10, 50 */}
+              {/* 🌟 แถวที่ 1: แก้ไขปุ่มลัดให้นำออก (-) และเป็นสีแดงอ่อน */}
               <div className="grid grid-cols-3 gap-3">
                 {[5, 10, 50].map(num => (
-                  <button key={num} onClick={() => setAmount(prev => prev + num)} className="bg-blue-50 hover:bg-blue-100 text-blue-600 py-4 rounded-2xl font-black text-xl border-b-4 border-blue-200 active:translate-y-1 active:border-b-0 transition-all">
-                    +{num}
+                  <button 
+                    key={num} 
+                    onClick={() => setAmount(prev => Math.max(1, prev - num))} // ลบค่า และต้องไม่น้อยกว่า 1
+                    className="bg-red-50 hover:bg-red-100 text-red-600 py-4 rounded-2xl font-black text-xl border-b-4 border-red-200 active:translate-y-1 active:border-b-0 transition-all" // เปลี่ยนสีเป็นสีแดงอ่อน
+                  >
+                    -{num} {/* เปลี่ยนเครื่องหมายเป็นลบ */}
                   </button>
                 ))}
               </div>
 
-              {/* แถวที่ 2: ปรับทีละ 1 */}
-              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl">
-                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-red-500"><Minus size={30} strokeWidth={3}/></button>
-                <div className="text-center">
-                  <span className="text-5xl font-black tabular-nums">{amount}</span>
+              {/* แถวที่ 2: ปรับทีละ 1 (แก้ไขปุ่มลบเป็นสีแดงอ่อน) และช่องใส่จำนวนให้คีย์ได้ */}
+              <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl gap-2">
+                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-red-500 hover:bg-red-100"> {/* เพิ่มสีโฮเวอร์สีแดงอ่อน */}
+                  <Minus size={30} strokeWidth={3}/>
+                </button>
+                <div className="flex-1 text-center bg-white rounded-2xl p-2 shadow-sm"> {/* ปรับสไตล์ให้เป็นกล่องใส่จำนวน */}
+                  <input
+                    type="number"
+                    min="1"
+                    value={amount}
+                    onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 1))} // จัดการการพิมพ์ตัวเลข ต้องไม่น้อยกว่า 1 และเป็นตัวเลข
+                    className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent" // ลบสไตล์ input พื้นฐาน
+                  />
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{selectedProduct.unit}</p>
                 </div>
-                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-green-500"><Plus size={30} strokeWidth={3}/></button>
+                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-green-500 hover:bg-green-100">
+                  <Plus size={30} strokeWidth={3}/>
+                </button>
               </div>
 
-              {/* ช่องหมายเหตุ (Note) */}
+              {/* ช่องหมายเหตุ (Note) (เหมือนเดิม) */}
               <div className="relative">
                 <FileText className="absolute left-4 top-4 text-slate-300" size={20}/>
                 <textarea 
