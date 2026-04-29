@@ -44,21 +44,32 @@ export default function ScanPage() {
   const startScanner = async (mode: 'receive' | 'issue') => {
     try {
       setScanMode(mode)
-      setIsScanning(true)
-      const scanner = new Html5Qrcode("reader")
-      scannerRef.current = scanner
+      setIsScanning(true) // 1. เปิด Modal ขึ้นมาก่อน
       
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
-        (decodedText) => {
-          handleProcessTransaction(decodedText, mode)
-          stopScanner()
-        },
-        () => {}
-      )
+      // 2. รอจังหวะให้ React วาด Element "reader" ให้เสร็จก่อน (300ms)
+      setTimeout(async () => {
+        try {
+          const scanner = new Html5Qrcode("reader")
+          scannerRef.current = scanner
+          
+          await scanner.start(
+            { facingMode: "environment" }, 
+            { fps: 15, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              handleProcessTransaction(decodedText, mode)
+              stopScanner()
+            },
+            () => {} // ไม่พบรหัส (ข้ามไป)
+          )
+        } catch (err: any) {
+          console.error("Camera error:", err)
+          // ถ้าเปิดไม่ได้ ให้มันบอกหน่อยว่าติดอะไร
+          alert("❌ กล้องไม่ทำงาน: " + (err.message || "กรุณาเช็กสิทธิ์การเข้าถึงกล้อง"));
+          setIsScanning(false)
+        }
+      }, 300); // ดีเลย์นิดนึงให้ UI พร้อม
+
     } catch (err) {
-      alert("ไม่สามารถเข้าถึงกล้องได้")
       setIsScanning(false)
     }
   }
