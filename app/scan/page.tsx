@@ -1,260 +1,192 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation' // เพิ่มตัวนี้เพื่อใช้เด้งไปหน้า Login
-import { Minus, Plus, Camera, Search, RefreshCw, X, User, Clock, ArrowRight, MessageSquare, Calendar, Hash } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { 
+  QrCode, LogOut, Clock, ChevronDown, ChevronUp, 
+  LayoutDashboard, Camera, Search, History, Calendar, X
+} from 'lucide-react'
 
 export default function ScanPage() {
   const router = useRouter()
-  const [product, setProduct] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [manualCode, setManualCode] = useState('')
-  const [isScanning, setIsScanning] = useState(false)
-  
-  const [mode, setMode] = useState<'receive' | 'issue'>('receive')
-  const [adjustment, setAdjustment] = useState(0)
-  const [note, setNote] = useState('')
-  const [showConfirm, setShowConfirm] = useState(false)
-  
-  // ประกาศ userName ตัวเดียวที่ดึงจาก Auth
-  const [userName, setUserName] = useState('Guest')
+  const [personalLogs, setPersonalLogs] = useState<any[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [scanInput, setScanInput] = useState('')
 
-  // ระบบดักสต๊อก
-  const isStockShort = mode === 'issue' && adjustment > (product?.current_stock || 0);
-
-  // เช็ค User ตอนเข้าหน้าเว็บ
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setUserName(user.email?.split('@')[0].toUpperCase() || 'USER')
-      } else {
-        router.push('/login') // ถ้าไม่ล็อคอิน ให้กลับไปหน้า Login
-      }
+  // ฟังก์ชันดึงข้อมูลพนักงานและประวัติ
+  const fetchUserData = useCallback(async () => {
+    // ดึง session ปัจจุบัน
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return
     }
-    checkUser()
+
+    // 1. ดึงชื่อจาก Profile เพื่อนำไป Query หาประวัติ
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', session.user.id)
+      .single()
+    
+    // กำหนดชื่อคนสแกน (ใช้จาก Profile หรือ Metadata หรือ Email)
+    const currentName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0];
+
+    // 2. ดึงประวัติสแกนของคนนี้ทั้งหมด
+    const { data: logs } = await supabase
+      .from('transactions')
+      .select('*, products(name, unit, sku_15_digits)')
+      .eq('created_by', currentName)
+      .order('created_at', { ascending: false })
+    
+    if (logs) setPersonalLogs(logs)
+    setLoading(false)
   }, [router])
 
-  const startScanner = async () => {
-    const html5QrCode = new Html5Qrcode("reader");
-    setIsScanning(true);
-    try {
-      await html5QrCode.start(
-        { facingMode: "environment" }, 
-        { fps: 15, qrbox: { width: 200, height: 200 } },
-        (decodedText) => {
-          fetchProduct(decodedText);
-          html5QrCode.stop().then(() => setIsScanning(false));
-        },
-        () => {}
-      );
-    } catch (err) {
-      alert("เปิดกล้องไม่ได้");
-      setIsScanning(false);
-    }
-  };
+  useEffect(() => {
+    fetchUserData()
+    // ตั้งเวลา Refresh ข้อมูลทุก 5 นาที (ไม่ต้อง Logout)
+    const interval = setInterval(fetchUserData, 300000);
+    return () => clearInterval(interval);
+  }, [fetchUserData])
 
-  const fetchProduct = async (sku: string) => {
-    setLoading(true)
-    const { data } = await supabase.from('products').select('*').eq('sku_15_digits', sku).single()
-    if (data) {
-      setProduct(data)
-      setAdjustment(0)
-      setNote('')
-    } else {
-      alert('ไม่พบรหัสสินค้า: ' + sku)
-    }
-    setLoading(false)
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
-  const handleQuickAdd = (num: number) => {
-    setAdjustment(prev => {
-      const next = prev + num;
-      if (mode === 'issue' && next > product.current_stock) return product.current_stock;
-      return next;
+  // --- จัดกลุ่มข้อมูลตามวัน ---
+  const groupedByDate = personalLogs.reduce((acc: any, log: any) => {
+    const date = new Date(log.created_at).toLocaleDateString('th-TH', {
+      year: 'numeric', month: 'long', day: 'numeric'
     });
-  };
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(log);
+    return acc;
+  }, {});
 
-  const handleManualInput = (val: string) => {
-    let num = parseInt(val) || 0;
-    if (num < 0) num = 0;
-    if (mode === 'issue' && num > product.current_stock) num = product.current_stock;
-    setAdjustment(num);
-  };
-
-const confirmUpdate = async () => {
-  const finalAmount = mode === 'receive' ? adjustment : -adjustment;
-  const newStock = product.current_stock + finalAmount;
-
-  // บันทึกประวัติ (ชื่อคอลัมน์ต้องตรงกับใน SQL)
-  const { error: txError } = await supabase.from('transactions').insert([{
-    product_id: product.id,
-    type: mode,
-    amount: adjustment,    // ต้องชื่อ 'amount' ตามที่เราแก้ SQL ด้านบน
-    stock_before: product.current_stock,
-    stock_after: newStock,
-    note: note,
-    created_by: userName   // ชื่อจากระบบ Login
-  }]);
-
-  if (txError) {
-    alert("บันทึกประวัติล้มเหลว: " + txError.message);
-    return;
-  }
-
-  // อัปเดตสต๊อกในตาราง products
-  const { error: updateError } = await supabase
-    .from('products')
-    .update({ current_stock: newStock })
-    .eq('id', product.id);
-
-  if (!updateError) {
-    alert("✅ บันทึกรายการสำเร็จ!");
-    setProduct(null);
-    setShowConfirm(false);
-  }
-};
+  if (loading) return (
+    <div className="h-screen bg-[#0a0f18] flex items-center justify-center">
+      <div className="text-blue-500 font-black animate-pulse uppercase tracking-[0.3em]">Loading System...</div>
+    </div>
+  )
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-gray-950 text-slate-100 overflow-hidden font-sans">
-      <header className="p-3 flex justify-between items-center bg-black/20 border-b border-white/5">
-        <h1 className="text-xs font-bold tracking-widest flex items-center gap-2">
-          <Camera size={16} className="text-blue-400" /> STOCK SYSTEM
-        </h1>
-        {product && (
-          <button onClick={() => setProduct(null)} className="p-1.5 bg-white/10 rounded-full">
-            <X size={18} />
-          </button>
-        )}
+    <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white font-sans overflow-hidden">
+      
+      {/* --- TOP HEADER: ปุ่ม "ประวัติรายการ" สีฟ้าสว่าง --- */}
+      <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-blue-500/20 z-[110] shadow-2xl">
+        <div className="flex items-center gap-3">
+          <div className="bg-blue-600 p-2 rounded-lg"><Camera size={18} className="text-white" /></div>
+          <h1 className="text-[12px] font-black uppercase tracking-[0.2em] italic text-blue-400">Scan Center</h1>
+        </div>
+
+        {/* ปุ่มประวัติรายการ (เพิ่มสีสว่างและเงาเพื่อให้เห็นชัด) */}
+        <button 
+          onClick={() => setShowHistory(true)}
+          className="flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white px-6 py-3 rounded-full transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.5)] border border-blue-300"
+        >
+          <History size={20} />
+          <span className="text-sm font-black uppercase tracking-widest">ประวัติรายการ</span>
+        </button>
       </header>
 
-      <main className="flex-1 flex flex-col p-3 gap-3 overflow-hidden">
-        {!product && (
-          <div className="flex-1 flex flex-col gap-3">
-            <div className="flex-1 relative rounded-[2.5rem] bg-black overflow-hidden border border-white/10 shadow-2xl">
-              <div id="reader" className="w-full h-full"></div>
-              {!isScanning && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900">
-                  <button onClick={startScanner} className="bg-blue-600 px-10 py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95">เปิดกล้องสแกน</button>
+      <div className="flex-1 relative flex flex-col">
+        
+        {/* --- DRILL-DOWN HISTORY: ทับเต็มจอเมื่อกดปุ่ม --- */}
+        {showHistory && (
+          <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in fade-in zoom-in duration-300">
+             <div className="max-w-md mx-auto space-y-8">
+                <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                   <div className="flex items-center gap-3 text-blue-500">
+                      <History size={28} />
+                      <h3 className="text-2xl font-black italic uppercase tracking-tighter">My History</h3>
+                   </div>
+                   <button 
+                     onClick={() => setShowHistory(false)} 
+                     className="bg-white/10 p-3 rounded-full text-white hover:bg-red-500/20 transition-all"
+                   >
+                     <X size={28}/>
+                   </button>
                 </div>
-              )}
-            </div>
-            <div className="flex gap-2 p-1.5 bg-white/5 rounded-2xl border border-white/10">
-              <input type="text" placeholder="พิมพ์รหัส 15 หลัก..." className="flex-1 bg-transparent px-3 outline-none text-sm" value={manualCode} onChange={(e) => setManualCode(e.target.value)} />
-              <button onClick={() => fetchProduct(manualCode)} className="bg-blue-600 p-3 rounded-xl"><Search size={20} /></button>
-            </div>
+                
+                {Object.keys(groupedByDate).length === 0 ? (
+                  <div className="py-20 text-center opacity-20 font-black uppercase tracking-widest italic text-sm">ไม่พบประวัติการบันทึก</div>
+                ) : (
+                  Object.entries(groupedByDate).map(([date, logs]: [string, any]) => (
+                    <div key={date} className="space-y-4">
+                      <div className="flex items-center gap-2 text-blue-400 bg-blue-500/10 p-3 rounded-xl border border-blue-500/20">
+                        <Calendar size={18} />
+                        <span className="text-sm font-black uppercase tracking-widest">{date}</span>
+                      </div>
+
+                      <div className="space-y-3 pl-2 border-l-2 border-blue-500/20">
+                        {logs.map((log: any) => (
+                          <div key={log.id} className="bg-white rounded-[2rem] p-6 flex flex-col gap-4 text-slate-900 shadow-2xl relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+                            <div className="flex justify-between items-start">
+                              <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
+                              <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                                {log.type === 'receive' ? '+' : '-'} {log.amount}
+                              </span>
+                            </div>
+
+                            <div className="bg-slate-100 p-4 rounded-2xl">
+                              <p className="text-2xl font-mono font-black text-blue-700 tracking-widest uppercase">
+                                {log.products?.sku_15_digits}
+                              </p>
+                            </div>
+
+                            <div className="flex justify-end items-center text-slate-400 font-black text-xs uppercase italic">
+                              <span className="flex items-center gap-1 bg-[#0a0f18] text-white px-4 py-1.5 rounded-full text-[12px] tracking-widest">
+                                <Clock size={14} className="text-blue-500" />
+                                {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+             </div>
           </div>
         )}
 
-        {product && !showConfirm && (
-          <div className="flex-1 flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-5">
-            <div className="bg-gradient-to-br from-blue-600 to-blue-800 p-5 rounded-[2.5rem] shadow-xl flex items-center justify-between border border-blue-400/20">
-              <div className="flex-1 min-w-0">
-                <h2 className="text-lg font-black truncate mb-1 uppercase">{product.name}</h2>
-                <p className="text-[10px] font-mono opacity-60 truncate">{product.sku_15_digits}</p>
-              </div>
-              <div className="text-right ml-4">
-                <p className="text-[9px] opacity-70 font-bold uppercase mb-1">คงเหลือ</p>
-                <p className="text-4xl font-black leading-none">{product.current_stock}</p>
-              </div>
-            </div>
-
-            <div className="flex-1 bg-white text-slate-900 rounded-[2.5rem] p-5 flex flex-col gap-3 shadow-2xl overflow-hidden">
-              <div className="flex p-1 bg-gray-100 rounded-2xl">
-                <button onClick={() => {setMode('receive'); setAdjustment(0);}} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'receive' ? 'bg-white shadow-sm text-green-600' : 'text-gray-400'}`}>
-                  <Plus size={14}/> รับเข้า
-                </button>
-                <button onClick={() => {setMode('issue'); setAdjustment(0);}} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-xs transition-all ${mode === 'issue' ? 'bg-white shadow-sm text-red-600' : 'text-gray-400'}`}>
-                  <Minus size={14}/> นำออก
-                </button>
-              </div>
-
-              <div className="flex w-full items-stretch gap-2 h-16">
-                <input 
-                  type="number" 
-                  className={`flex-1 w-0 min-w-0 text-3xl font-black rounded-2xl bg-gray-50 border-2 text-center outline-none ${isStockShort ? 'border-red-500 text-red-600' : 'border-transparent focus:border-blue-500'}`} 
-                  value={adjustment || ''} 
-                  onChange={(e) => handleManualInput(e.target.value)}
-                  placeholder="0"
-                />
-                <button onClick={() => setAdjustment(prev => Math.max(0, prev - 1))} className="w-16 flex-shrink-0 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400"><Minus size={24} /></button>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {[1, 5, 10, 50].map(num => (
-                  <button key={num} onClick={() => handleQuickAdd(num)} className={`py-3.5 rounded-2xl font-black text-sm active:scale-90 transition-all ${mode === 'receive' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>{mode === 'receive' ? '+' : '-'}{num}</button>
-                ))}
-              </div>
-
-              <div className={`p-4 rounded-2xl border-2 border-dashed flex justify-between items-center ${mode === 'receive' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">คำนวณ</span>
-                <span className={`text-xl font-black ${mode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
-                  {product.current_stock} {mode === 'receive' ? '+' : '-'} {adjustment} = {mode === 'receive' ? product.current_stock + adjustment : product.current_stock - adjustment}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <MessageSquare size={16} className="text-gray-300" />
-                <input type="text" placeholder="ระบุหมายเหตุ..." className="bg-transparent flex-1 text-sm outline-none font-medium" value={note} onChange={(e) => setNote(e.target.value)} />
-              </div>
-
-              <div className="flex gap-2 mt-auto pt-2">
-                <button onClick={() => setProduct(null)} className="flex-1 py-4 bg-gray-50 text-gray-400 rounded-2xl font-bold text-sm">ยกเลิก</button>
-                <button onClick={() => setShowConfirm(true)} disabled={adjustment === 0} className={`flex-[2.5] py-4 rounded-2xl font-black text-sm shadow-xl ${adjustment === 0 ? 'bg-gray-200 text-gray-400' : 'bg-blue-600 text-white shadow-blue-200'}`}>บันทึกรายการ</button>
-              </div>
+        {/* --- MAIN SCAN AREA --- */}
+        <main className="flex-1 flex flex-col items-center justify-center p-8 gap-12">
+          <div className="relative group">
+            <div className="absolute -inset-20 bg-blue-500/10 blur-[120px] rounded-full animate-pulse"></div>
+            <div className="relative w-72 h-72 border-2 border-dashed border-white/20 rounded-[5rem] flex flex-col items-center justify-center gap-6 bg-white/5 backdrop-blur-sm border-blue-500/30">
+               <QrCode size={80} className="text-blue-500" />
+               <button className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter shadow-[0_10px_40px_rgba(37,99,235,0.4)] transition-all active:scale-95">
+                  สแกนสินค้า
+               </button>
             </div>
           </div>
-        )}
-      </main>
 
-      {showConfirm && (
-        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-md z-50 flex items-center justify-center p-6 text-gray-900">
-          <div className="bg-white w-full max-w-sm rounded-[3rem] overflow-hidden animate-in zoom-in duration-300 shadow-2xl">
-            <div className={`p-8 text-center text-white ${mode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>
-              <h3 className="text-2xl font-black mb-1 leading-none uppercase">ยืนยันรายการ</h3>
-              <div className="flex flex-col items-center gap-1 mt-3 opacity-90">
-                <div className="flex items-center gap-1 text-[11px] font-black uppercase tracking-widest">
-                  <User size={12} /> {userName}
-                </div>
-                <div className="flex items-center gap-1 text-[10px] font-bold">
-                  <Calendar size={12} /> {new Date().toLocaleDateString('th-TH')} <Clock size={12} className="ml-1" /> {new Date().toLocaleTimeString('th-TH')}
-                </div>
-              </div>
-            </div>
-            <div className="p-8 space-y-6">
-              <div className="space-y-1 text-center border-b border-gray-50 pb-4">
-                 <h4 className="text-lg font-black text-gray-800 leading-tight uppercase">{product.name}</h4>
-                 <p className="text-[10px] font-mono text-gray-400 flex items-center justify-center gap-1"><Hash size={10} /> {product.sku_15_digits}</p>
-              </div>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center text-xs px-2">
-                  <span className="text-gray-400 font-bold uppercase tracking-tighter">ยอดปัจจุบัน</span>
-                  <span className="font-bold text-gray-500">{product.current_stock} {product.unit}</span>
-                </div>
-                <div className="flex justify-between items-center text-xs px-2 -mt-2">
-                  <span className={`font-black uppercase tracking-tighter ${mode === 'receive' ? 'text-green-500' : 'text-red-500'}`}>
-                    {mode === 'receive' ? 'รับเข้าสินค้า' : 'นำออกสินค้า'}
-                  </span>
-                  <span className={`font-black text-sm ${mode === 'receive' ? 'text-green-500' : 'text-red-500'}`}>
-                    {mode === 'receive' ? '+' : '-'} {adjustment} {product.unit}
-                  </span>
-                </div>
-                <div className="bg-gray-50 p-6 rounded-[2.5rem] flex items-center justify-between border-2 border-gray-100 shadow-inner">
-                  <span className="text-gray-400 text-[10px] font-black uppercase">ยอดหลังอัปเดต</span>
-                  <span className={`text-5xl font-black ${mode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
-                    {mode === 'receive' ? product.current_stock + adjustment : product.current_stock - adjustment}
-                  </span>
-                </div>
-              </div>
-              <div className="flex gap-4 pt-2">
-                <button onClick={() => setShowConfirm(false)} className="flex-1 py-4 font-bold text-gray-300">แก้ไข</button>
-                <button onClick={confirmUpdate} className="flex-[2.5] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-200">บันทึกข้อมูล</button>
-              </div>
-            </div>
+          <div className="w-full max-w-sm relative">
+            <input 
+              type="text" 
+              placeholder="กรอกรหัส 15 หลัก..." 
+              className="w-full bg-[#111827] border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-white font-black text-center tracking-[0.2em] text-2xl shadow-2xl"
+              value={scanInput}
+              onChange={(e) => setScanInput(e.target.value)}
+            />
           </div>
-        </div>
-      )}
+        </main>
+      </div>
+
+      {/* --- FOOTER --- */}
+      <footer className="p-6 flex justify-between items-center bg-[#111827] border-t border-white/5 shrink-0">
+          <button onClick={() => router.push('/dashboard')} className="text-[10px] font-black uppercase text-blue-400 hover:text-white transition-colors tracking-widest">
+             Admin Dashboard
+          </button>
+          <button onClick={handleLogout} className="text-[10px] font-black uppercase text-red-500 hover:text-white transition-colors tracking-widest">
+             Sign Out
+          </button>
+      </footer>
     </div>
   )
 }
