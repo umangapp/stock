@@ -1,11 +1,12 @@
 // lib/skuHelper.ts
 
 /**
- * สูตรเจนรหัส SKU ฉบับปรับปรุง (พี่ตั้ม Version):
- * 1. ลบจุดทศนิยมออกทั้งหมด
- * 2. หนาเอาแค่ 2 ตัวหน้า
- * 3. เรียงลำดับ: ตัวย่อ + กว้าง + หนา + ยาว + วันที่
- * 4. เติม x ให้ครบ 15 หลัก
+ * สูตรเจนรหัส SKU ฉบับสมบูรณ์ (พี่ตั้ม Version - Final):
+ * 1. ลบจุดทศนิยมออกทั้งหมด (Width, Thickness, Length)
+ * 2. "หนา" ตัดเอาแค่ 2 ตัวหน้า
+ * 3. "ยาว" ตัดเอาแค่ 2 ตัวหน้า
+ * 4. เรียงลำดับ: ตัวย่อ + กว้าง + หนา + ยาว + วันที่
+ * 5. เติม x ให้ครบ 15 หลัก
  */
 export const generateSKU = (p: {
   prefix?: string;
@@ -16,17 +17,24 @@ export const generateSKU = (p: {
 }) => {
   if (!p) return 'ERROR';
 
-  // เตรียมค่าพื้นฐานและลบจุดทศนิยมออก
+  // 1. เตรียมค่าและลบจุดทศนิยมออกให้หมด
   const pre = (p.prefix || 'XXX').toUpperCase();
   const w = String(p.width || '').replace(/\./g, ''); 
-  const hRaw = String(p.height || '').replace(/\./g, ''); // ลบจุดก่อนตัด
-  const h = hRaw.slice(0, 2); // ✅ ตัดเอาแค่ 2 หลักแรกหลังจากลบจุดแล้ว
-  const l = String(p.length || '').replace(/\./g, '');
+  
+  // 2. หนา (Thickness) -> ลบจุด + ตัด 2 ตัวแรก
+  const hRaw = String(p.height || '').replace(/\./g, '');
+  const h = hRaw.slice(0, 2); 
+
+  // 3. ยาว (Length) -> ลบจุด + ตัด 2 ตัวแรก (จุดที่แก้ไข)
+  const lRaw = String(p.length || '').replace(/\./g, '');
+  const l = lRaw.slice(0, 2);
+
+  // 4. วันที่ 6 หลัก
   const dt = String(p.received_date || '').replace(/\s/g, '').slice(0, 6);
 
-  // รวมร่างรหัสตามลำดับที่พี่ตั้มสั่ง
+  // 5. รวมร่าง: ตัวย่อ + กว้าง + หนา + ยาว + วันที่
   const raw = pre + w + h + l + dt;
 
-  // เติม x ให้ครบ 15 หลัก
+  // 6. ตบท้ายด้วย x ให้ครบ 15 หลักพอดี
   return raw.padEnd(15, 'x').slice(0, 15);
 };
