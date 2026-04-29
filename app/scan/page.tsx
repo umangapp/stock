@@ -2,10 +2,10 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import { generateSKU } from '@/lib/skuHelper'
-import { Html5Qrcode } from 'html5-qrcode' // 🌟 ต้องติดตั้งตัวนี้ก่อน
+import { Html5Qrcode } from 'html5-qrcode'
 import { 
-  QrCode, LogOut, Clock, History, Calendar, X, Camera, Search, RefreshCw, PackageCheck 
+  QrCode, LogOut, Clock, History, Calendar, X, Camera, Search, 
+  ArrowDownCircle, ArrowUpCircle, CheckCircle2
 } from 'lucide-react'
 
 export default function ScanPage() {
@@ -17,6 +17,7 @@ export default function ScanPage() {
   
   // Scanner States
   const [isScanning, setIsScanning] = useState(false)
+  const [scanMode, setScanMode] = useState<'receive' | 'issue' | null>(null)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const [activeUser, setActiveName] = useState('')
 
@@ -39,24 +40,24 @@ export default function ScanPage() {
 
   useEffect(() => { fetchUserData() }, [fetchUserData])
 
-  // --- 📸 ระบบควบคุมกล้อง ---
-  const startScanner = async () => {
+  // --- 📸 ระบบควบคุมกล้อง (แยกตามโหมด) ---
+  const startScanner = async (mode: 'receive' | 'issue') => {
     try {
+      setScanMode(mode)
       setIsScanning(true)
       const scanner = new Html5Qrcode("reader")
       scannerRef.current = scanner
       
       await scanner.start(
-        { facingMode: "environment" }, // ใช้กล้องหลัง
+        { facingMode: "environment" },
         { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-          handleProcessScan(decodedText) // เมื่อสแกนติด
+          handleProcessTransaction(decodedText, mode)
           stopScanner()
         },
-        () => {} // ไม่พบรหัส (ข้าม)
+        () => {}
       )
     } catch (err) {
-      console.error(err)
       alert("ไม่สามารถเข้าถึงกล้องได้")
       setIsScanning(false)
     }
@@ -64,54 +65,50 @@ export default function ScanPage() {
 
   const stopScanner = async () => {
     if (scannerRef.current) {
-      await scannerRef.current.stop()
+      try {
+        await scannerRef.current.stop()
+      } catch (e) { console.log("Stop error", e) }
       scannerRef.current = null
       setIsScanning(false)
+      setScanMode(null)
     }
   }
 
-  // --- 📦 ระบบจัดการสต๊อกหลังสแกน ---
-  const handleProcessScan = async (sku: string) => {
-    // 1. ค้นหาสินค้า
-    const { data: product, error } = await supabase
+  // --- 📦 ระบบบันทึกรายการ ---
+  const handleProcessTransaction = async (sku: string, mode: 'receive' | 'issue') => {
+    const { data: product } = await supabase
       .from('products')
       .select('*')
       .eq('sku_15_digits', sku)
       .single()
 
     if (!product) {
-      alert("❌ ไม่พบสินค้ารหัสนี้ในระบบ: " + sku)
+      alert("❌ ไม่พบสินค้าในระบบ: " + sku)
       return
     }
 
-    // 2. ถามจำนวนและประเภท (รับเข้า/จ่ายออก)
-    const type = confirm(`พบสินค้า: ${product.name}\nกด ตกลง(+) เพื่อรับเข้า | กด ยกเลิก(-) เพื่อจ่ายออก`) ? 'receive' : 'issue';
-    const amountStr = prompt(`ป้อนจำนวนที่ต้องการ (${product.unit}):`, "1");
+    const amountStr = prompt(`[${mode === 'receive' ? 'นำเข้า' : 'นำออก'}] ${product.name}\nป้อนจำนวน (${product.unit}):`, "1");
     const amount = Number(amountStr);
 
-    if (isNaN(amount) || amount <= 0) {
-      alert("จำนวนไม่ถูกต้อง");
-      return;
-    }
+    if (isNaN(amount) || amount <= 0) return;
 
-    // 3. อัปเดตสต๊อกและบันทึก Log
-    const newStock = type === 'receive' ? product.current_stock + amount : product.current_stock - amount;
+    const newStock = mode === 'receive' ? product.current_stock + amount : product.current_stock - amount;
 
     const { error: updateErr } = await supabase.from('products').update({ current_stock: newStock }).eq('id', product.id);
     await supabase.from('transactions').insert([{
       product_id: product.id,
-      type,
+      type: mode,
       amount,
       created_by: activeUser
     }]);
 
     if (!updateErr) {
-      alert(`✅ บันทึกสำเร็จ!\nสต๊อกคงเหลือ: ${newStock} ${product.unit}`);
+      alert(`✅ บันทึกเรียบร้อย!\nสต๊อกคงเหลือ: ${newStock} ${product.unit}`);
       fetchUserData();
+      setScanInput('');
     }
   }
 
-  // --- จัดกลุ่มประวัติ ---
   const groupedByDate = personalLogs.reduce((acc: any, log: any) => {
     const date = new Date(log.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
     if (!acc[date]) acc[date] = [];
@@ -119,46 +116,47 @@ export default function ScanPage() {
     return acc;
   }, {});
 
-  if (loading) return <div className="h-screen bg-[#0a0f18] flex items-center justify-center text-blue-500 font-black animate-pulse uppercase tracking-[0.3em]">Loading...</div>
+  if (loading) return <div className="h-screen bg-[#0a0f18] flex items-center justify-center text-blue-500 font-black tracking-widest">LOADING...</div>
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white font-sans overflow-hidden">
       
       {/* HEADER */}
-      <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-blue-500/20 z-[110] shadow-2xl">
+      <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-[110]">
         <div className="flex items-center gap-3">
-          <div className="bg-blue-600 p-2 rounded-lg shadow-lg"><Camera size={18} className="text-white" /></div>
-          <h1 className="text-[12px] font-black uppercase tracking-[0.2em] italic text-blue-400">Scan Center</h1>
+          <QrCode className="text-blue-500" />
+          <h1 className="text-xs font-black uppercase tracking-[0.2em] italic">Scan Center</h1>
         </div>
-        <button onClick={() => setShowHistory(true)} className="flex items-center gap-2 bg-blue-500 text-white px-6 py-3 rounded-full transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.4)] border border-blue-300">
-          <History size={20} /><span className="text-sm font-black uppercase tracking-widest text-[11px]">ประวัติรายการ</span>
+        <button onClick={() => setShowHistory(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all">
+          ประวัติรายการ
         </button>
       </header>
 
       <div className="flex-1 relative flex flex-col">
         
-        {/* DRILL-DOWN HISTORY */}
+        {/* HISTORY OVERLAY */}
         {showHistory && (
-          <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in fade-in zoom-in duration-300">
+          <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
              <div className="max-w-md mx-auto space-y-6 pb-20">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                   <div className="flex items-center gap-3 text-blue-500"><History size={28} /><h3 className="text-2xl font-black italic uppercase tracking-tighter">My History</h3></div>
-                   <button onClick={() => setShowHistory(false)} className="bg-white/10 p-3 rounded-full text-white"><X size={28}/></button>
+                <div className="flex items-center justify-between mb-8">
+                   <h3 className="text-2xl font-black italic uppercase text-blue-500">My Activity</h3>
+                   <button onClick={() => setShowHistory(false)} className="bg-white/10 p-2 rounded-full"><X/></button>
                 </div>
                 {Object.entries(groupedByDate).map(([date, logs]: [string, any]) => (
                   <div key={date} className="space-y-4">
-                    <div className="flex items-center gap-2 text-blue-400 bg-blue-500/10 p-3 rounded-xl border border-blue-500/20"><Calendar size={18} /><span className="text-[12px] font-black uppercase tracking-widest">{date}</span></div>
+                    <div className="text-[11px] font-black uppercase text-slate-500 tracking-widest border-l-2 border-blue-500 pl-3">{date}</div>
                     {logs.map((log: any) => (
-                      <div key={log.id} className="bg-white rounded-[2rem] p-6 flex flex-col gap-4 text-slate-900 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-2 h-full bg-blue-500"></div>
+                      <div key={log.id} className="bg-white rounded-[1.5rem] p-5 flex flex-col gap-3 text-slate-900 shadow-xl">
                         <div className="flex justify-between items-start">
-                          <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
-                          <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
+                          <p className="font-black text-lg leading-none">{log.products?.name}</p>
+                          <span className={`font-black text-2xl ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                            {log.type === 'receive' ? '+' : '-'} {log.amount}
+                          </span>
                         </div>
-                        <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200">
-                          <p className="text-xl font-mono font-black text-blue-700 tracking-widest uppercase">{log.products?.sku_15_digits}</p>
+                        <p className="font-mono text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded-lg">{log.products?.sku_15_digits}</p>
+                        <div className="flex justify-end text-[10px] font-bold text-slate-400 uppercase italic">
+                          <Clock size={12} className="mr-1"/> {new Date(log.created_at).toLocaleTimeString('th-TH')}
                         </div>
-                        <div className="flex justify-end italic text-slate-400 font-bold text-[10px]"><Clock size={12} className="mr-1 text-blue-500" />{new Date(log.created_at).toLocaleTimeString('th-TH')}</div>
                       </div>
                     ))}
                   </div>
@@ -167,58 +165,70 @@ export default function ScanPage() {
           </div>
         )}
 
-        {/* MAIN SCAN AREA */}
-        <main className="flex-1 flex flex-col items-center justify-center p-8 gap-8">
+        {/* MAIN SCAN BUTTONS (แบบเดิม) */}
+        <main className="flex-1 flex flex-col p-8 gap-6 justify-center max-w-sm mx-auto w-full">
           
-          <div className="relative w-full max-w-sm aspect-square bg-slate-900 rounded-[4rem] border-2 border-dashed border-blue-500/30 overflow-hidden flex items-center justify-center">
-            {/* จุดแสดงภาพกล้อง */}
-            <div id="reader" className="w-full h-full object-cover"></div>
-            
-            {!isScanning && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-slate-900/80 backdrop-blur-sm">
-                 <QrCode size={80} className="text-blue-500/20" />
-                 <button 
-                  onClick={startScanner}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-5 rounded-[2rem] font-black text-xl uppercase italic shadow-[0_10px_40px_rgba(37,99,235,0.4)] transition-all active:scale-95"
-                 >
-                    สแกนสินค้า
-                 </button>
-              </div>
-            )}
+          {/* ปุ่มที่ 1: นำเข้า */}
+          <button 
+            onClick={() => startScanner('receive')}
+            className="flex-1 bg-green-600 hover:bg-green-500 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl shadow-green-900/20 border-b-8 border-green-800"
+          >
+            <ArrowDownCircle size={60} />
+            <span className="text-2xl font-black uppercase italic tracking-tighter">นำเข้าสินค้า</span>
+          </button>
 
-            {isScanning && (
-              <button 
-                onClick={stopScanner}
-                className="absolute bottom-6 bg-red-600/80 backdrop-blur-md text-white px-6 py-2 rounded-full font-black text-[10px] uppercase tracking-widest"
-              >
-                ปิดกล้อง
-              </button>
-            )}
-          </div>
+          {/* ปุ่มที่ 2: นำออก */}
+          <button 
+            onClick={() => startScanner('issue')}
+            className="flex-1 bg-red-600 hover:bg-red-500 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl shadow-red-900/20 border-b-8 border-red-800"
+          >
+            <ArrowUpCircle size={60} />
+            <span className="text-2xl font-black uppercase italic tracking-tighter">นำออกสินค้า</span>
+          </button>
 
-          <div className="w-full max-w-sm relative group">
+          {/* Manual Input Search */}
+          <div className="mt-4 relative group">
             <input 
               type="text" 
               placeholder="กรอกรหัส 15 หลัก..." 
-              className="w-full bg-[#111827] border border-white/10 p-7 rounded-[2.5rem] outline-none focus:border-blue-500 text-white font-black text-center tracking-[0.2em] text-2xl shadow-2xl"
+              className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none focus:border-blue-500 text-center font-black tracking-widest"
               value={scanInput}
               onChange={(e) => setScanInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleProcessScan(scanInput)}
             />
             <button 
-              onClick={() => handleProcessScan(scanInput)}
-              className="absolute right-4 top-1/2 -translate-y-1/2 bg-blue-600 p-3 rounded-2xl text-white"
+              onClick={() => {
+                const mode = confirm("กด ตกลง(+) เพื่อรับเข้า | กด ยกเลิก(-) เพื่อจ่ายออก") ? 'receive' : 'issue';
+                handleProcessTransaction(scanInput, mode);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2"
             >
-              <Search size={24}/>
+              <CheckCircle2 size={24}/>
             </button>
           </div>
         </main>
       </div>
 
+      {/* CAMERA MODAL */}
+      {isScanning && (
+        <div className="fixed inset-0 bg-black z-[200] flex flex-col">
+          <div className="flex justify-between items-center p-6 bg-slate-900">
+            <p className="font-black uppercase italic text-blue-400">
+              {scanMode === 'receive' ? 'โหมดนำเข้าสินค้า (+)' : 'โหมดนำออกสินค้า (-)'}
+            </p>
+            <button onClick={stopScanner} className="bg-red-500 text-white p-2 rounded-full"><X/></button>
+          </div>
+          <div id="reader" className="flex-1"></div>
+          <div className="p-8 bg-slate-900 text-center">
+            <p className="text-xs text-slate-500 uppercase font-bold tracking-widest animate-pulse">Scanning Barcode / QR Code...</p>
+          </div>
+        </div>
+      )}
+
       {/* FOOTER */}
-      <footer className="p-6 flex justify-between items-center bg-[#111827] border-t border-white/5 shrink-0">
-          <button onClick={() => router.push('/dashboard')} className="text-[10px] font-black uppercase text-blue-400 hover:text-white transition-colors tracking-widest">Admin Dashboard</button>
-          <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="text-[10px] font-black uppercase text-red-500 hover:text-white transition-colors tracking-widest">Sign Out</button>
+      <footer className="p-4 flex justify-center bg-[#111827]">
+          <button onClick={() => router.push('/dashboard')} className="text-[10px] font-black uppercase text-slate-500 hover:text-white transition-colors tracking-[0.2em]">
+             Admin Dashboard
+          </button>
       </footer>
     </div>
   )
