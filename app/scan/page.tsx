@@ -22,7 +22,7 @@ export default function ScanPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const [activeUser, setActiveName] = useState('')
 
-  // Transaction Modal States (แผงควบคุมจำนวนที่พี่ตั้มสั่ง)
+  // Transaction Modal States
   const [showActionModal, setShowActionModal] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [amount, setAmount] = useState(1)
@@ -37,7 +37,7 @@ export default function ScanPage() {
     setActiveName(currentName)
 
     const { data: logs } = await supabase.from('transactions')
-      .select('*, products(name, unit, sku_15_digits)')
+      .select('*, products(name, unit, sku_15_digits, width, height, length)')
       .eq('created_by', currentName)
       .order('created_at', { ascending: false })
     
@@ -47,7 +47,6 @@ export default function ScanPage() {
 
   useEffect(() => { fetchUserData() }, [fetchUserData])
 
-  // --- 📸 ระบบควบคุมกล้อง ---
   const startScanner = async (mode: 'receive' | 'issue') => {
     setScanMode(mode)
     setIsScanning(true)
@@ -65,7 +64,7 @@ export default function ScanPage() {
           () => {}
         )
       } catch (err) {
-        alert("ไม่สามารถเปิดกล้องได้ กรุณาเช็กสิทธิ์การเข้าถึง")
+        alert("ไม่สามารถเปิดกล้องได้")
         setIsScanning(false)
       }
     }, 300)
@@ -79,7 +78,6 @@ export default function ScanPage() {
     }
   }
 
-  // --- 📦 ระบบค้นหาสินค้าเพื่อทำรายการ ---
   const handleLookupProduct = async (sku: string, mode: 'receive' | 'issue') => {
     const { data: product } = await supabase
       .from('products')
@@ -96,10 +94,9 @@ export default function ScanPage() {
     setScanMode(mode)
     setAmount(1)
     setNote('')
-    setShowActionModal(true) // เปิดแผงควบคุมจำนวน
+    setShowActionModal(true)
   }
 
-  // --- 💾 บันทึกลงฐานข้อมูล ---
   const handleSaveTransaction = async () => {
     if (!selectedProduct || amount <= 0) return
 
@@ -108,12 +105,11 @@ export default function ScanPage() {
       : selectedProduct.current_stock - amount
 
     const { error: updateErr } = await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id)
-    
     const { error: logErr } = await supabase.from('transactions').insert([{
       product_id: selectedProduct.id,
       type: scanMode,
       amount,
-      note, // บันทึกโน้ต
+      note,
       created_by: activeUser
     }])
 
@@ -145,13 +141,12 @@ export default function ScanPage() {
           <QrCode className="text-blue-500" />
           <h1 className="text-xs font-black uppercase tracking-[0.2em] italic">Scan Center</h1>
         </div>
-        <button onClick={() => setShowHistory(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg shadow-blue-500/20 active:scale-95 transition-all">
+        <button onClick={() => setShowHistory(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-full text-[11px] font-black uppercase tracking-widest shadow-lg active:scale-95 transition-all">
           ประวัติรายการ
         </button>
       </header>
 
       <div className="flex-1 relative flex flex-col">
-        
         {/* HISTORY OVERLAY */}
         {showHistory && (
           <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
@@ -171,11 +166,10 @@ export default function ScanPage() {
                             {log.type === 'receive' ? '+' : '-'} {log.amount}
                           </span>
                         </div>
-                        <p className="font-mono text-sm font-bold text-blue-600 bg-blue-50 p-2 rounded-lg">{log.products?.sku_15_digits}</p>
-                        {log.note && <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg italic">Note: {log.note}</p>}
-                        <div className="flex justify-end text-[10px] font-bold text-slate-400 uppercase italic">
-                          <Clock size={12} className="mr-1"/> {new Date(log.created_at).toLocaleTimeString('th-TH')}
-                        </div>
+                        <p className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 p-2 rounded-lg">{log.products?.sku_15_digits}</p>
+                        <p className="text-[10px] font-bold text-slate-400 italic">ขนาด: {log.products?.width} x {log.products?.height} x {log.products?.length} มม.</p>
+                        {log.note && <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg">Note: {log.note}</p>}
+                        <div className="flex justify-end text-[10px] font-bold text-slate-300"><Clock size={12} className="mr-1"/> {new Date(log.created_at).toLocaleTimeString('th-TH')}</div>
                       </div>
                     ))}
                   </div>
@@ -184,16 +178,14 @@ export default function ScanPage() {
           </div>
         )}
 
-        {/* MAIN BUTTONS (เหมือนเดิมเป๊ะ) */}
+        {/* MAIN BUTTONS */}
         <main className="flex-1 flex flex-col p-8 gap-6 justify-center max-w-sm mx-auto w-full">
           <button onClick={() => startScanner('receive')} className="flex-1 bg-green-600 hover:bg-green-500 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl border-b-8 border-green-800">
             <ArrowDownCircle size={60} /><span className="text-2xl font-black uppercase italic tracking-tighter">นำเข้าสินค้า</span>
           </button>
-
           <button onClick={() => startScanner('issue')} className="flex-1 bg-red-600 hover:bg-red-500 rounded-[2.5rem] flex flex-col items-center justify-center gap-4 transition-all active:scale-95 shadow-2xl border-b-8 border-red-800">
             <ArrowUpCircle size={60} /><span className="text-2xl font-black uppercase italic tracking-tighter">นำออกสินค้า</span>
           </button>
-
           <div className="mt-4 relative">
             <input type="text" placeholder="พิมพ์รหัส 15 หลัก..." className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none focus:border-blue-500 text-center font-black tracking-widest uppercase" value={scanInput} onChange={(e) => setScanInput(e.target.value)} />
             <button onClick={() => handleLookupProduct(scanInput, 'receive')} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2"><Search size={24}/></button>
@@ -201,53 +193,52 @@ export default function ScanPage() {
         </main>
       </div>
 
-     {/* --- 🛠 แผงควบคุมจำนวนและโน้ต (MODAL ที่แก้ไขแล้ว) --- */}
+      {/* --- 🛠 MODAL จัดการจำนวนสินค้า (แก้ไขแล้ว) --- */}
       {showActionModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 text-slate-900 animate-in slide-in-from-bottom duration-300">
             <div className="flex justify-between items-start mb-6">
               <div>
                 <h2 className="text-2xl font-black uppercase italic tracking-tighter leading-none">{selectedProduct.name}</h2>
-                <p className="text-blue-600 font-mono font-bold mt-2 text-sm">{selectedProduct.sku_15_digits}</p>
+                {/* 🌟 แสดงขนาดสินค้า กว้าง x หนา x ยาว มม. */}
+                <p className="text-[12px] font-black text-slate-400 mt-2 uppercase tracking-widest">
+                  ขนาด: {selectedProduct.width} x {selectedProduct.height} x {selectedProduct.length} มม.
+                </p>
+                <p className="text-blue-600 font-mono font-bold mt-1 text-[12px]">{selectedProduct.sku_15_digits}</p>
               </div>
               <button onClick={() => setShowActionModal(false)} className="bg-slate-100 p-2 rounded-full text-slate-400"><X/></button>
             </div>
 
             <div className="space-y-6">
-              {/* 🌟 แถวที่ 1: แก้ไขปุ่มลัดให้นำออก (-) และเป็นสีแดงอ่อน */}
+              {/* แถวที่ 1: ปุ่มลัด (แก้ไขให้บวกค่าเข้า amount เสมอ) */}
               <div className="grid grid-cols-3 gap-3">
                 {[5, 10, 50].map(num => (
                   <button 
                     key={num} 
-                    onClick={() => setAmount(prev => Math.max(1, prev - num))} // ลบค่า และต้องไม่น้อยกว่า 1
-                    className="bg-red-50 hover:bg-red-100 text-red-600 py-4 rounded-2xl font-black text-xl border-b-4 border-red-200 active:translate-y-1 active:border-b-0 transition-all" // เปลี่ยนสีเป็นสีแดงอ่อน
+                    onClick={() => setAmount(prev => prev + num)}
+                    className={`${scanMode === 'receive' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-red-50 text-red-600 border-red-200'} py-4 rounded-2xl font-black text-xl border-b-4 active:translate-y-1 active:border-b-0 transition-all`}
                   >
-                    -{num} {/* เปลี่ยนเครื่องหมายเป็นลบ */}
+                    {scanMode === 'receive' ? '+' : '-'}{num}
                   </button>
                 ))}
               </div>
 
-              {/* แถวที่ 2: ปรับทีละ 1 (แก้ไขปุ่มลบเป็นสีแดงอ่อน) และช่องใส่จำนวนให้คีย์ได้ */}
+              {/* แถวที่ 2: ปรับทีละ 1 และช่องใส่จำนวนที่คีย์เลขได้ */}
               <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl gap-2">
-                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-red-500 hover:bg-red-100"> {/* เพิ่มสีโฮเวอร์สีแดงอ่อน */}
-                  <Minus size={30} strokeWidth={3}/>
-                </button>
-                <div className="flex-1 text-center bg-white rounded-2xl p-2 shadow-sm"> {/* ปรับสไตล์ให้เป็นกล่องใส่จำนวน */}
+                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-red-500"><Minus size={30} strokeWidth={3}/></button>
+                <div className="flex-1 text-center bg-white rounded-2xl p-2 shadow-sm">
                   <input
                     type="number"
-                    min="1"
                     value={amount}
-                    onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 1))} // จัดการการพิมพ์ตัวเลข ต้องไม่น้อยกว่า 1 และเป็นตัวเลข
-                    className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent" // ลบสไตล์ input พื้นฐาน
+                    onChange={(e) => setAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent"
                   />
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{selectedProduct.unit}</p>
                 </div>
-                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-green-500 hover:bg-green-100">
-                  <Plus size={30} strokeWidth={3}/>
-                </button>
+                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm text-green-500"><Plus size={30} strokeWidth={3}/></button>
               </div>
 
-              {/* ช่องหมายเหตุ (Note) (เหมือนเดิม) */}
+              {/* ช่องหมายเหตุ */}
               <div className="relative">
                 <FileText className="absolute left-4 top-4 text-slate-300" size={20}/>
                 <textarea 
@@ -273,16 +264,10 @@ export default function ScanPage() {
       {isScanning && (
         <div className="fixed inset-0 bg-black z-[200] flex flex-col">
           <div className="flex justify-between items-center p-6 bg-slate-900 border-b border-white/5">
-            <p className="font-black uppercase italic text-blue-400 tracking-widest">
-              Scanning Mode: {scanMode === 'receive' ? 'RECEIVE (+)' : 'ISSUE (-)'}
-            </p>
-            <button onClick={stopScanner} className="bg-red-500 text-white p-3 rounded-full shadow-lg"><X/></button>
+            <p className="font-black uppercase italic text-blue-400">Mode: {scanMode?.toUpperCase()}</p>
+            <button onClick={stopScanner} className="bg-red-50 text-red-600 p-2 rounded-full"><X/></button>
           </div>
           <div id="reader" className="flex-1 bg-black"></div>
-          <div className="p-10 bg-slate-900 text-center">
-            <div className="w-16 h-1 border-t-2 border-blue-500 mx-auto animate-pulse mb-4"></div>
-            <p className="text-[10px] text-slate-500 uppercase font-black tracking-[0.3em]">Align barcode within frame</p>
-          </div>
         </div>
       )}
     </div>
