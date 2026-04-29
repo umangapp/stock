@@ -6,7 +6,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import { generateSKU } from '@/lib/skuHelper'
 import { 
   QrCode, Clock, History, Calendar, X, Camera, Search, 
-  ArrowDownCircle, ArrowUpCircle, Plus, Minus, FileText, CheckCircle2, AlertCircle
+  ArrowDownCircle, ArrowUpCircle, Plus, Minus, FileText, AlertCircle
 } from 'lucide-react'
 
 export default function ScanPage() {
@@ -24,7 +24,7 @@ export default function ScanPage() {
 
   // Transaction Modal States
   const [showActionModal, setShowActionModal] = useState(false)
-  const [showSummaryModal, setShowSummaryModal] = useState(false) // 🌟 หน้าสรุป
+  const [showSummaryModal, setShowSummaryModal] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [amount, setAmount] = useState(1)
   const [note, setNote] = useState('')
@@ -98,7 +98,6 @@ export default function ScanPage() {
     setShowActionModal(true)
   }
 
-  // --- 💾 บันทึกจริง (หลังจากผ่านหน้าสรุป) ---
   const handleSaveTransaction = async () => {
     if (!selectedProduct || amount <= 0) return
 
@@ -148,7 +147,7 @@ export default function ScanPage() {
       </header>
 
       <div className="flex-1 relative flex flex-col">
-        {/* HISTORY OVERLAY */}
+        {/* HISTORY OVERLAY (เหมือนเดิม) */}
         {showHistory && (
           <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in slide-in-from-right duration-300">
              <div className="max-w-md mx-auto space-y-6 pb-20 text-slate-900">
@@ -169,7 +168,6 @@ export default function ScanPage() {
                         </div>
                         <p className="font-mono text-[12px] font-bold text-blue-600 bg-blue-50 p-2 rounded-lg">{log.products?.sku_15_digits}</p>
                         <p className="text-[10px] font-bold text-slate-400 italic">ขนาด: {log.products?.width} x {log.products?.height} x {log.products?.length} มม.</p>
-                        {log.note && <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg">Note: {log.note}</p>}
                         <div className="flex justify-end text-[10px] font-bold text-slate-300"><Clock size={12} className="mr-1"/> {new Date(log.created_at).toLocaleTimeString('th-TH')}</div>
                       </div>
                     ))}
@@ -194,7 +192,7 @@ export default function ScanPage() {
         </main>
       </div>
 
-      {/* --- 🛠 MODAL 1: จัดการจำนวน (โชว์สต๊อกปัจจุบัน) --- */}
+      {/* --- 🛠 MODAL 1: จัดการจำนวน --- */}
       {showActionModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[300] flex items-end sm:items-center justify-center">
           <div className="bg-white w-full max-w-md rounded-t-[3rem] sm:rounded-[3rem] p-8 text-slate-900 animate-in slide-in-from-bottom duration-300 shadow-2xl">
@@ -204,19 +202,14 @@ export default function ScanPage() {
                 <p className="text-[13px] font-black text-slate-400 mt-2 uppercase tracking-widest">
                   ขนาด: {selectedProduct.width} x {selectedProduct.height} x {selectedProduct.length} มม.
                 </p>
-                <p className="text-blue-600 font-mono font-bold mt-1 text-[12px]">{selectedProduct.sku_15_digits}</p>
               </div>
               <button onClick={() => setShowActionModal(false)} className="bg-slate-100 p-2 rounded-full text-slate-400"><X/></button>
             </div>
-
             <div className="space-y-6">
-              {/* ส่วนแสดงสต๊อกคงเหลือในระบบ */}
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center">
-                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">สต๊อกคงเหลือในระบบ</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">คงเหลือในระบบ</span>
                  <span className="text-xl font-black">{selectedProduct.current_stock} <span className="text-[10px] opacity-50">{selectedProduct.unit}</span></span>
               </div>
-
-              {/* ปุ่มลัด 5 10 50 */}
               <div className="grid grid-cols-3 gap-3">
                 {[5, 10, 50].map(num => (
                   <button key={num} onClick={() => setAmount(prev => prev + num)} className={`${scanMode === 'receive' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-red-50 text-red-600 border-red-200'} py-4 rounded-2xl font-black text-xl border-b-4 active:translate-y-1 active:border-b-0 transition-all`}>
@@ -224,25 +217,18 @@ export default function ScanPage() {
                   </button>
                 ))}
               </div>
-
-              {/* ปรับทีละ 1 และคีย์เลขได้ */}
               <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl gap-2 border border-slate-200 shadow-inner">
-                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md ${scanMode === 'receive' ? 'text-slate-400' : 'text-red-500'}`}><Minus size={30} strokeWidth={3}/></button>
-                <div className="flex-1 text-center bg-white rounded-2xl p-2 shadow-sm">
-                  <input type="number" value={amount} onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 0))} className="w-full text-5xl font-black tabular-nums text-center outline-none border-none bg-transparent" />
-                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{selectedProduct.unit}</p>
+                <button onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm"><Minus size={30} strokeWidth={3}/></button>
+                <div className="flex-1 text-center bg-white rounded-2xl p-2">
+                  <input type="number" value={amount} onChange={(e) => setAmount(Math.max(1, parseInt(e.target.value) || 0))} className="w-full text-5xl font-black text-center outline-none bg-transparent" />
+                  <p className="text-[10px] font-black uppercase text-slate-400">{selectedProduct.unit}</p>
                 </div>
-                <button onClick={() => setAmount(prev => prev + 1)} className={`w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-md ${scanMode === 'receive' ? 'text-green-500' : 'text-slate-400'}`}><Plus size={30} strokeWidth={3}/></button>
+                <button onClick={() => setAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><Plus size={30} strokeWidth={3}/></button>
               </div>
-
               <div className="relative">
                 <FileText className="absolute left-4 top-4 text-slate-300" size={20}/><textarea placeholder="หมายเหตุ (ถ้ามี)..." className="w-full bg-slate-50 border border-slate-100 rounded-2xl p-4 pl-12 text-sm font-bold outline-none h-20" value={note} onChange={(e) => setNote(e.target.value)}/>
               </div>
-
-              <button 
-                onClick={() => setShowSummaryModal(true)} // 🌟 กดยืนยันแล้วไปหน้าสรุป
-                className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter text-white shadow-xl transition-all active:scale-95 ${scanMode === 'receive' ? 'bg-green-600 shadow-green-200' : 'bg-red-600 shadow-red-200'}`}
-              >
+              <button onClick={() => setShowSummaryModal(true)} className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic tracking-tighter text-white shadow-xl transition-all active:scale-95 ${scanMode === 'receive' ? 'bg-green-600 shadow-green-200' : 'bg-red-600 shadow-red-200'}`}>
                 ยืนยัน{scanMode === 'receive' ? 'นำเข้า' : 'นำออก'}
               </button>
             </div>
@@ -250,45 +236,54 @@ export default function ScanPage() {
         </div>
       )}
 
-      {/* --- 🌟 MODAL 2: สรุปรายการก่อนบันทึกจริง --- */}
+      {/* --- 🌟 MODAL 2: สรุปรายการ (แบบ NO SCROLL + แสดงขนาด) --- */}
       {showSummaryModal && selectedProduct && (
-        <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-xl z-[400] flex items-center justify-center p-6">
-           <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-slate-900 shadow-2xl animate-in zoom-in duration-200">
-              <div className="flex flex-col items-center text-center mb-8">
-                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                    <AlertCircle size={40} />
+        <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-xl z-[400] flex items-center justify-center p-4">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-6 text-slate-900 shadow-2xl animate-in zoom-in duration-200">
+              <div className="flex flex-col items-center text-center mb-4">
+                 <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-2 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                    <AlertCircle size={32} />
                  </div>
-                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">สรุปรายการ</h3>
-                 <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">กรุณาตรวจสอบความถูกต้อง</p>
+                 <h3 className="text-xl font-black uppercase italic tracking-tighter">สรุปรายการ</h3>
+                 <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest leading-none">กรุณาตรวจสอบความถูกต้อง</p>
               </div>
 
-              <div className="space-y-4 mb-10">
-                 <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">สินค้า</span>
-                    <span className="font-bold text-sm">{selectedProduct.name}</span>
+              <div className="space-y-2.5 mb-6">
+                 {/* สินค้า + ขนาด (เพิ่มเข้าไปตามสั่ง) */}
+                 <div className="flex flex-col border-b border-slate-100 pb-2">
+                    <div className="flex justify-between items-center">
+                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">สินค้า</span>
+                       <span className="font-black text-sm">{selectedProduct.name}</span>
+                    </div>
+                    <div className="text-right">
+                       <span className="text-[10px] font-bold text-blue-500 italic">
+                          ({selectedProduct.width} x {selectedProduct.height} x {selectedProduct.length} มม.)
+                       </span>
+                    </div>
                  </div>
-                 <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">รหัส SKU</span>
-                    <span className="font-mono font-black text-blue-600 text-[11px]">{selectedProduct.sku_15_digits}</span>
+
+                 <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">รหัส SKU</span>
+                    <span className="font-mono font-black text-blue-600 text-[11px] leading-none">{selectedProduct.sku_15_digits}</span>
                  </div>
-                 <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">ประเภท</span>
-                    <span className={`font-black text-sm uppercase ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                 <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">ประเภท</span>
+                    <span className={`font-black text-[12px] uppercase ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
                        {scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}
                     </span>
                  </div>
-                 <div className="flex justify-between border-b border-slate-100 pb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase">จำนวน</span>
-                    <span className="font-black text-xl">{amount} {selectedProduct.unit}</span>
+                 <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">จำนวน</span>
+                    <span className="font-black text-[16px]">{amount} {selectedProduct.unit}</span>
                  </div>
 
-                 {/* สรุปยอดสต๊อกใหม่ */}
-                 <div className="bg-slate-50 p-4 rounded-2xl mt-4">
-                    <div className="flex justify-between text-xs font-bold">
+                 {/* สรุปยอดสต๊อกใหม่ (กระชับขึ้น) */}
+                 <div className="bg-slate-50 p-3 rounded-xl mt-1">
+                    <div className="flex justify-between text-[11px] font-bold text-slate-500">
                        <span>สต๊อกเดิม:</span>
                        <span>{selectedProduct.current_stock}</span>
                     </div>
-                    <div className="flex justify-between text-xs font-black mt-2 pt-2 border-t border-slate-200">
+                    <div className="flex justify-between text-[13px] font-black mt-1 pt-1 border-t border-slate-200">
                        <span>ยอดคงเหลือใหม่:</span>
                        <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>
                           {scanMode === 'receive' ? selectedProduct.current_stock + amount : selectedProduct.current_stock - amount} {selectedProduct.unit}
@@ -298,8 +293,8 @@ export default function ScanPage() {
               </div>
 
               <div className="flex gap-3">
-                 <button onClick={() => setShowSummaryModal(false)} className="flex-1 bg-slate-100 py-4 rounded-2xl font-black text-slate-400 uppercase tracking-widest text-[11px]">แก้ไข</button>
-                 <button onClick={handleSaveTransaction} className={`flex-[2] py-4 rounded-2xl font-black text-white shadow-lg ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>ยืนยันทำรายการ</button>
+                 <button onClick={() => setShowSummaryModal(false)} className="flex-1 bg-slate-100 py-3.5 rounded-xl font-black text-slate-400 uppercase tracking-widest text-[10px]">แก้ไข</button>
+                 <button onClick={handleSaveTransaction} className={`flex-[2] py-3.5 rounded-xl font-black text-white shadow-lg shadow-blue-500/10 ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>ยืนยันทำรายการ</button>
               </div>
            </div>
         </div>
