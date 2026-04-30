@@ -257,22 +257,31 @@ export default function AdminDashboard() {
               {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
                 <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400 text-slate-800">
                   <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
-                    <div><h3 className="font-black uppercase text-xl truncate w-32 tracking-tighter">{group.name}</h3><p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p></div>
-                    <div className="text-right"><p className="text-4xl font-black text-slate-900 leading-none">{group.totalStock}</p><p className="text-[10px] font-black uppercase text-slate-400 mt-1">{group.unit}</p></div>
-                  </div>
+                    {/* 🌟 ปรับตรงนี้: เพิ่ม flex-1 และ pr-4 ส่วน h3 เอา truncate กับ w-32 ออก */}
+                      <div className="flex-1 pr-4">
+                        <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
+                      </div>
+                      {/* 🌟 ปรับตรงนี้: เพิ่ม shrink-0 เพื่อไม่ให้ตัวเลขโดนเบียด */}
+                      <div className="text-right shrink-0">
+                        <p className="text-4xl font-black text-slate-900 leading-none">{group.totalStock}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-400 mt-1">{group.unit}</p>
+                      </div>
+                    </div>
                   {expandedGroups.includes(group.name) && (
                     <div className="p-4 bg-slate-50 space-y-3">
                       {group.items.map((item: any) => (
                         <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm">
                           <div>
                             {/* 🌟 แสดง SKU แยกสีใน Inventory */}
-                            <div className="mb-1 leading-none">
-                              <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">ขนาด: {item.height} x {item.width} x {item.length} มม.</p>
-                            <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
-                          </div>
-                          <div className="flex flex-col gap-2">
+                      <div className="flex-1">
+                        <div className="mb-1 leading-none">
+                          <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} />
+                        </div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">ขนาด: {item.height} x {item.width} x {item.length} มม.</p>
+                        <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
+                      </div>
+                          <div className="flex flex-col gap-2 shrink-0 ml-4">
                              <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
                              <button onClick={() => deleteProduct(item.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
                           </div>
