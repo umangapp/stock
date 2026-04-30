@@ -123,6 +123,26 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
+  const deleteProduct = async (id: string) => {
+    if (!confirm("⚠️ ยืนยันการลบสินค้า?\nประวัติการสแกนทั้งหมดของสินค้านี้จะถูกลบถาวร!")) return;
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        // ถ้าติด Error เช่น มีประวัติค้างอยู่และไม่ได้รัน SQL ขั้นตอนที่ 1
+        alert("❌ ไม่สามารถลบได้: " + error.message);
+      } else {
+        alert("✅ ลบสินค้าเรียบร้อยแล้ว");
+        fetchData(); // สั่งรีโหลดข้อมูลหน้าจอใหม่
+      }
+    } catch (err) {
+      alert("❌ เกิดข้อผิดพลาดในการเชื่อมต่อ");
+    }
+  };
   const groupedInventory = products.reduce((acc: any, item: any) => {
     if (!acc[item.name]) acc[item.name] = { name: item.name, totalStock: 0, unit: item.unit, items: [] };
     acc[item.name].totalStock += item.current_stock;
