@@ -2,7 +2,49 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, Zap } from 'lucide-react'
+import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, Zap, AlertCircle } from 'lucide-react'
+
+// --- 🔊 ฟังก์ชันเสียง ---
+const playScanSound = () => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+  oscillator.type = 'square'; oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.01);
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+  oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.12);
+};
+
+const playErrorSound = () => {
+  const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.connect(gainNode); gainNode.connect(audioCtx.destination);
+  oscillator.type = 'sawtooth'; oscillator.frequency.setValueAtTime(150, audioCtx.currentTime);
+  gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+  gainNode.gain.linearRampToValueAtTime(0.8, audioCtx.currentTime + 0.05);
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5);
+  oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
+};
+
+// --- 🎨 แยกสี SKU ---
+const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
+  if (!sku) return null;
+  const preLen = prefix?.length || 2;
+  const paddingMatch = sku.match(/x+$/);
+  const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  const p1 = sku.substring(0, preLen);
+  const p4 = sku.substring(sku.length - paddingLen);
+  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
+  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+  return (
+    <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px]">
+      <span className="text-blue-600">{p1}</span><span className="text-green-600">{p2}</span><span className="text-orange-500">{p3}</span><span className="text-cyan-400">{p4}</span>
+    </span>
+  );
+};
 
 export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose, onRefresh }: any) {
   const [basket, setBasket] = useState<any[]>([])
@@ -33,9 +75,12 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
     if (p) {
         if (scanMode === 'issue') {
             const inBasket = basket.find(item => item.sku_15_digits === p.sku_15_digits);
-            if ((inBasket ? inBasket.amount : 0) + 1 > p.current_stock) { /* playErrorSound(); */ alert("สต๊อกไม่พอ!"); isScanLocked.current = false; return; }
+            if ((inBasket ? inBasket.amount : 0) + 1 > p.current_stock) { 
+                playErrorSound(); alert(`❌ สต๊อก "${p.name}" ไม่พอ!`); 
+                isScanLocked.current = false; return; 
+            }
         }
-        /* playScanSound(); */
+        playScanSound();
         setBasket(prev => {
             const idx = prev.findIndex(item => item.sku_15_digits === p.sku_15_digits);
             if (idx > -1) {
@@ -51,66 +96,94 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
 
   const handleFinalSave = async () => {
     setIsSaving(true);
-    for (const item of basket) {
-        const newStock = scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount;
-        await supabase.from('products').update({ current_stock: newStock }).eq('id', item.id);
-        await supabase.from('transactions').insert([{ product_id: item.id, type: scanMode, amount: item.amount, old_stock: item.current_stock, new_stock: newStock, created_by: activeUser }]);
-    }
-    onRefresh(); onClose();
+    try {
+      for (const item of basket) {
+          const newStock = scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount;
+          await supabase.from('products').update({ current_stock: newStock }).eq('id', item.id);
+          await supabase.from('transactions').insert([{ product_id: item.id, type: scanMode, amount: item.amount, old_stock: item.current_stock, new_stock: newStock, created_by: activeUser }]);
+      }
+      onRefresh(); onClose();
+    } catch (e) { alert("Error"); } finally { setIsSaving(false); }
   }
 
   return (
-    <div className="flex-1 flex flex-col relative bg-black overflow-hidden">
-      <div className="h-[300px] w-full relative shrink-0">
+    <div className="flex-1 flex flex-col relative bg-black overflow-hidden font-sans">
+      <div className="h-[300px] w-full relative bg-black shrink-0 border-b border-white/10">
         <div id="batch-reader" className="w-full h-full"></div>
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
            <div className="w-[180px] h-[180px] border-2 border-white/50 rounded-lg shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]"></div>
         </div>
-        {visualLock && <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center z-50 border-[10px] border-green-500"><div className="bg-white px-8 py-3 rounded-full font-black text-green-600">SUCCESS!</div></div>}
-        <button onClick={onClose} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full z-50"><X/></button>
+        {visualLock && <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center z-50 border-[10px] border-green-500 animate-in fade-in"><div className="bg-white px-8 py-3 rounded-full font-black text-green-600 shadow-2xl flex items-center gap-2"><CheckCircle2 size={20}/> SUCCESS!</div></div>}
+        <button onClick={onClose} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full z-50 shadow-xl active:scale-90 transition-all"><X size={24}/></button>
       </div>
 
       <div className="flex-1 flex flex-col bg-slate-50 rounded-t-[3rem] mt-[-30px] z-10 shadow-2xl overflow-hidden text-slate-900">
           <div className="p-6 flex justify-between items-center border-b bg-white shrink-0">
-             <div className="flex items-center gap-2"><ShoppingCart className="text-blue-600"/><span className="font-black uppercase text-sm">ในชุด ({basket.length})</span></div>
-             {basket.length > 0 && <button onClick={() => setShowBatchSummary(true)} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-6 py-3 rounded-2xl font-black text-xs`}>ยืนยันบันทึก</button>}
+             <div className="flex items-center gap-2"><div className="bg-blue-100 p-2 rounded-xl text-blue-600"><ShoppingCart size={20}/></div><span className="font-black uppercase text-sm italic tracking-tight">ในชุดสแกน ({basket.length})</span></div>
+             {basket.length > 0 && <button onClick={() => setShowBatchSummary(true)} className={`${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} text-white px-6 py-3 rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95 transition-all`}><CheckCircle2 size={16} className="inline mr-1"/> ยืนยันบันทึก</button>}
           </div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {basket.map((item, index) => (
-                <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2rem] border flex justify-between items-center ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10' : ''}`}>
-                   <div className="flex-1">
-                      <p className="font-black uppercase text-sm">{item.name}</p>
-                      <p className="text-[10px] text-slate-400 italic">{item.height}x{item.width}x{item.length} | LOT: {item.received_date}</p>
+                <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex justify-between items-center shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
+                   <div className="flex-1 pr-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        {index === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded italic animate-pulse">LATEST</span>}
+                        <p className="font-black uppercase text-sm leading-none">{item.name}</p>
+                      </div>
+                      <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
+                      <div className="flex items-center gap-2 mt-1.5 leading-none">
+                         <span className="text-[10px] font-bold text-slate-400 italic leading-none">{item.height}x{item.width}x{item.length}</span>
+                         <span className="text-[9px] font-black text-slate-500 uppercase bg-slate-100 px-1.5 py-0.5 rounded border leading-none">LOT: {item.received_date}</span>
+                      </div>
                    </div>
                    <div className="flex items-center gap-2">
-                      <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-2">
-                         <button onClick={() => setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: Math.max(1, i.amount-1)} : i))} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm"><Minus size={14}/></button>
-                         <span className="font-black w-4 text-center">{item.amount}</span>
-                         <button onClick={() => setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: i.amount+1} : i))} className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-blue-600 shadow-sm"><Plus size={14}/></button>
+                      <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-3 border border-slate-200">
+                         <button onClick={() => setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: Math.max(1, i.amount-1)} : i))} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm active:scale-90 transition-all"><Minus size={18}/></button>
+                         <span className="font-black text-slate-900 text-lg w-6 text-center leading-none">{item.amount}</span>
+                         <button onClick={() => {
+                             const newQty = item.amount + 1;
+                             if (scanMode === 'issue' && newQty > item.current_stock) { playErrorSound(); alert("สต๊อกไม่พอ!"); return; }
+                             setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: newQty} : i))
+                         }} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm active:scale-90 transition-all"><Plus size={18}/></button>
                       </div>
-                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-xl"><Trash2 size={16}/></button>
+                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
                    </div>
                 </div>
              ))}
           </div>
       </div>
 
-      {/* Batch Summary Modal (Simplified for space) */}
+      {/* --- 🌟 🌟 หน้าจอสรุปรายการชุด (Batch Summary Modal) 🌟 🌟 --- */}
       {showBatchSummary && (
-          <div className="fixed inset-0 bg-slate-900/98 z-[500] flex items-center justify-center p-4">
-              <div className="bg-white w-full max-w-md rounded-[3rem] p-8 flex flex-col max-h-[90vh]">
-                  <h3 className="text-2xl font-black uppercase text-center mb-6">สรุปรายการชุด</h3>
-                  <div className="flex-1 overflow-y-auto space-y-3 mb-6">
+          <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-2xl z-[500] flex items-center justify-center p-4">
+              <div className="bg-white w-full max-w-md rounded-[3rem] p-8 flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
+                  <div className="flex flex-col items-center text-center mb-6 shrink-0">
+                     <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}><AlertCircle size={40} /></div>
+                     <h3 className="text-2xl font-black uppercase italic text-slate-900 leading-none">สรุปรายการชุด</h3>
+                     <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">ตรวจสอบข้อมูล {basket.length} รายการก่อนบันทึก</p>
+                  </div>
+                  <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
                       {basket.map(item => (
-                          <div key={item.id} className="bg-slate-50 p-4 rounded-3xl flex justify-between items-center">
-                              <span className="font-black text-xs uppercase">{item.name}</span>
-                              <span className={`text-xl font-black ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'}{item.amount}</span>
+                          <div key={item.id} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex justify-between items-center shadow-sm">
+                              <div className="flex-1 pr-4">
+                                 <p className="font-black text-xs uppercase text-slate-800 leading-none mb-1">{item.name}</p>
+                                 <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
+                                 <p className="text-[9px] font-bold text-slate-400 mt-1 italic uppercase leading-none">
+                                    เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span>
+                                 </p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                 <span className={`text-2xl font-black leading-none ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'}{item.amount}</span>
+                                 <p className="text-[10px] font-black text-slate-300 uppercase">{item.unit}</p>
+                              </div>
                           </div>
                       ))}
                   </div>
-                  <div className="flex gap-4">
-                      <button onClick={() => setShowBatchSummary(false)} className="flex-1 py-5 rounded-3xl font-black text-slate-500 bg-slate-100">แก้</button>
-                      <button onClick={handleFinalSave} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>บันทึกทั้งหมด</button>
+                  <div className="flex gap-4 shrink-0">
+                      <button onClick={() => setShowBatchSummary(false)} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-100 uppercase text-xs active:scale-95 transition-all">กลับไปแก้</button>
+                      <button onClick={handleFinalSave} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 transition-all flex items-center justify-center gap-2`}>
+                        {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} ยืนยันบันทึก
+                      </button>
                   </div>
               </div>
           </div>
