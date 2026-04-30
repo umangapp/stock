@@ -25,6 +25,27 @@ export default function ScanPage() {
   const [activeUser, setActiveName] = useState('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
 
+const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
+  if (!sku) return null;
+  const preLen = prefix?.length || 2;
+  const paddingMatch = sku.match(/x+$/);
+  const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  
+  const p1 = sku.substring(0, preLen); // ตัวย่อ
+  const p4 = sku.substring(sku.length - paddingLen); // x
+  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen); // Lot Date
+  const p2 = sku.substring(preLen, sku.length - paddingLen - 6); // ขนาด
+
+  return (
+    <span className="font-mono font-black tracking-widest uppercase italic">
+      <span className="text-blue-600">{p1}</span>
+      <span className="text-green-600">{p2}</span>
+      <span className="text-orange-500">{p3}</span>
+      <span className="text-cyan-400">{p4}</span>
+    </span>
+  );
+};
+  
   const fetchUserData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return; }
@@ -111,6 +132,9 @@ export default function ScanPage() {
                        <TrendingUp size={12} className="text-blue-500" />
                        <p className="text-[11px] font-black text-slate-600">สต๊อก: {log.old_stock || 0} {log.type === 'receive' ? '+' : '-'} {log.amount} = {log.new_stock || 0}</p>
                     </div>
+                    <div className="mt-1">
+                      <SKUColored sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
+                    </div>
                     <p className="font-mono text-[11px] text-blue-400 font-bold">{log.products?.sku_15_digits}</p>
                     <div className="flex justify-between items-center mt-1 border-t pt-2">
                        <div className="flex items-center gap-1.5"><User size={10} className="text-blue-500" /><span className="text-[9px] font-black uppercase text-slate-500">{log.created_by}</span></div>
@@ -147,6 +171,10 @@ export default function ScanPage() {
               </div>
               <button onClick={() => setShowActionModal(false)} className="bg-slate-100 p-2 rounded-full text-slate-400"><X/></button>
             </div>
+            <div className="mb-1">
+              <SKUColored sku={selectedProduct.sku_15_digits} prefix={selectedProduct.prefix} />
+            </div>
+            
             <div className="space-y-6">
               <div className="bg-slate-900 text-white p-4 rounded-2xl flex justify-between items-center"><span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">คงเหลือปัจจุบัน</span><span className="text-xl font-black">{selectedProduct.current_stock} {selectedProduct.unit}</span></div>
               <div className="grid grid-cols-3 gap-3">
@@ -186,8 +214,12 @@ export default function ScanPage() {
                        </p>
 
                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">LOT DATE: {selectedProduct.received_date}</p>
+                      <p className="text-[11px] mt-1">
+                        <SKUColored sku={selectedProduct.sku_15_digits} prefix={selectedProduct.prefix} />
+                      </p>
                     </div>
                  </div>
+                               
                  <div className="flex justify-between border-b pb-1.5"><span className="text-[10px] font-black text-slate-400 uppercase">ประเภท</span><span className={`font-black text-[12px] uppercase ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}</span></div>
                  <div className="flex justify-between border-b pb-1.5"><span className="text-[10px] font-black text-slate-400 uppercase">จำนวน</span><span className="font-black text-lg">{amount} {selectedProduct.unit}</span></div>
                  <div className="bg-slate-50 p-3 rounded-xl">
