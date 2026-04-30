@@ -178,13 +178,24 @@ export default function AdminDashboard() {
                   </div>
                   {expandedUsers.includes(user) && (
                     <div className="p-4 bg-slate-50 space-y-4 max-h-[600px] overflow-y-auto">
-                      {logs.map((log: any) => (
-                        <div key={log.id} className="bg-white p-5 rounded-3xl border shadow-sm flex flex-col gap-3">
-                          <div className="flex justify-between items-start">
-                            <div><p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase">ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.</p></div>
-                            <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
+                     {logs.map((log: any) => (
+                      <div key={log.id} className="bg-white p-5 rounded-3xl border shadow-sm flex flex-col gap-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
+                            {/* ขนาดสินค้า (หนา x กว้าง x ยาว) */}
+                            <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase leading-none">
+                              ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.
+                            </p>
+                            {/* 🌟 เพิ่ม Lot Date ใต้ขนาดสินค้า */}
+                            <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase italic">
+                              Lot Date: {log.products?.received_date}
+                            </p>
                           </div>
+                          <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>
+                            {log.type === 'receive' ? '+' : '-'} {log.amount}
+                          </span>
+                        </div>
                           <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
                             <TrendingUp size={16} className="text-blue-500" /><p className="text-sm font-black text-slate-700 uppercase">สต๊อก: {log.old_stock || 0} {log.type === 'receive' ? '+' : '-'} {log.amount} = <span className="text-blue-600">{log.new_stock || 0}</span></p>
                           </div>
