@@ -218,19 +218,29 @@ export default function AdminDashboard() {
                   </div>
                   {expandedGroups.includes(group.name) && (
                     <div className="p-4 bg-slate-50 space-y-3">
-                      {group.items.map((item: any) => (
-                        <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm">
-                          <div>
-                            <p className="text-lg font-mono font-black text-blue-600 tracking-wider italic">{item.sku_15_digits}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">ขนาด: {item.height} x {item.width} x {item.length} มม.</p>
-                            <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                             <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
-                             <button onClick={() => { if(confirm("ลบสินค้านี้?")) supabase.from('products').delete().eq('id', item.id).then(()=>fetchData()) }} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
-                          </div>
-                        </div>
-                      ))}
+            {group.items.map((item: any) => (
+            <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm">
+            <div>
+              <p className="text-lg font-mono font-black text-blue-600 tracking-wider italic">{item.sku_15_digits}</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+              ขนาด: {item.height} x {item.width} x {item.length} มม.
+              </p>
+              <p className="font-black text-2xl text-slate-900 leading-none">
+            {item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span>
+              </p>
+            </div>
+          <div className="flex flex-col gap-2">
+           <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
+       
+           <button 
+             onClick={() => deleteProduct(item.id)} 
+             className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm active:scale-90"
+           >
+             <Trash2 size={18}/>
+             </button>
+          </div>
+          </div>
+        ))}
                     </div>
                   )}
                 </div>
