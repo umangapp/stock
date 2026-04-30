@@ -135,7 +135,6 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
                     <div className="mt-1">
                       <SKUColored sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
                     </div>
-                    <p className="font-mono text-[11px] text-blue-400 font-bold">{log.products?.sku_15_digits}</p>
                     <div className="flex justify-between items-center mt-1 border-t pt-2">
                        <div className="flex items-center gap-1.5"><User size={10} className="text-blue-500" /><span className="text-[9px] font-black uppercase text-slate-500">{log.created_by}</span></div>
                        <div className="flex items-center gap-1 text-[9px] font-bold text-slate-300 italic"><Clock size={10} /> {new Date(log.created_at).toLocaleTimeString('th-TH')}</div>
