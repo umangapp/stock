@@ -10,8 +10,8 @@ import {
   Plus, Minus, Trash2, CheckCircle2, ShoppingCart, Loader2, Zap, Clock, User
 } from 'lucide-react'
 
-// --- 🔊 ฟังก์ชันสร้างเสียงตี๊ด (Base64) ---
-const playBeep = () => {
+// --- 🔊 ฟังก์ชันเสียงตี๊ดแบบ Industrial (ดังและคม) ---
+const playScanSound = () => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const oscillator = audioCtx.createOscillator();
   const gainNode = audioCtx.createGain();
@@ -19,14 +19,14 @@ const playBeep = () => {
   oscillator.connect(gainNode);
   gainNode.connect(audioCtx.destination);
 
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(800, audioCtx.currentTime); // ความถี่เสียง 800Hz
+  oscillator.type = 'square'; // เปลี่ยนเป็น Square wave ให้เสียงดูดุดันแบบเครื่องจักร
+  oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime); // ความถี่สูงขึ้น
   gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
-  gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.01);
-  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15);
+  gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.01); // ดังขึ้น
+  gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1); // จบไวขึ้น
 
   oscillator.start();
-  oscillator.stop(audioCtx.currentTime + 0.2);
+  oscillator.stop(audioCtx.currentTime + 0.12);
 };
 
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
@@ -56,11 +56,11 @@ export default function ScanPage() {
   const [scanMode, setScanMode] = useState<'receive' | 'issue' | null>(null)
   const [scanMethod, setScanMethod] = useState<'single' | 'batch' | null>(null)
   const [isScanning, setIsScanning] = useState(false)
+  const [isLocked, setIsLocked] = useState(false); // 🌟 ตัวหน่วงเวลา
   const [scanInput, setScanInput] = useState('')
   
   const [basket, setBasket] = useState<BasketItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
-  const [lastScannedSku, setLastScannedSku] = useState('')
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [singleAmount, setSingleAmount] = useState(1)
@@ -101,24 +101,32 @@ export default function ScanPage() {
     setIsScanning(false); setScanMode(null); setScanMethod(null);
   }
 
+  // --- 🌟 Logic แบบรัวๆ (Batch) พร้อมหน่วง 1 วิ ---
   const handleBatchScan = async (sku: string) => {
+    if (isLocked) return; // ถ้าล็อคอยู่ ไม่รับค่า
     const cleanSku = sku.trim();
-    if (cleanSku === lastScannedSku) return;
-    setLastScannedSku(cleanSku);
-    setTimeout(() => setLastScannedSku(''), 1500);
+
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', cleanSku).single();
     if (p) {
-        playBeep(); // 🌟 เสียงตี๊ด
+        setIsLocked(true); // ล็อคทันที
+        playScanSound(); 
         setBasket(prev => addToBasket(prev, p));
+        
+        // ปลดล็อคหลังจาก 1 วินาที
+        setTimeout(() => setIsLocked(false), 1000);
     }
   }
 
   const handleSingleScan = async (sku: string) => {
+    if (isLocked) return;
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
     if (!p) { alert("ไม่พบสินค้า"); return; }
-    playBeep(); // 🌟 เสียงตี๊ด
+    
+    setIsLocked(true);
+    playScanSound();
     setSelectedProduct(p); setSingleAmount(1); setSingleNote(''); setShowActionModal(true);
     if (scannerRef.current) await scannerRef.current.pause();
+    setTimeout(() => setIsLocked(false), 1000);
   }
 
   const handleSaveSingle = async () => {
@@ -146,16 +154,16 @@ export default function ScanPage() {
   if (loading) return <div className="h-screen bg-[#0a0f18] flex items-center justify-center text-blue-500 font-black italic uppercase">Loading...</div>
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
+    <div className={`flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans transition-colors duration-300 ${isLocked ? 'ring-inset ring-8 ring-green-500/50' : ''}`}>
       <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-[110]">
         <div className="flex flex-col">
             <div className="flex items-center gap-2">
                 <QrCode className="text-blue-500" size={18} />
-                <h1 className="text-xs font-black uppercase italic text-blue-400 leading-none">Scan Center</h1>
+                <h1 className="text-xs font-black uppercase italic text-blue-400">Scan Center</h1>
             </div>
-            <p className="text-[8px] font-black text-slate-500 mt-1 ml-6 uppercase">Ver {appVersion}</p>
+            <p className="text-[8px] font-black text-slate-500 mt-1 ml-6 uppercase italic">Ver {appVersion}</p>
         </div>
-        <button onClick={() => setShowHistory(true)} className="bg-blue-600 px-5 py-2.5 rounded-full text-[11px] font-black uppercase active:scale-95">ประวัติ</button>
+        <button onClick={() => setShowHistory(true)} className="bg-blue-600 px-5 py-2.5 rounded-full text-[11px] font-black uppercase shadow-lg">ประวัติ</button>
       </header>
 
       <div className="flex-1 relative flex flex-col">
@@ -168,14 +176,9 @@ export default function ScanPage() {
                     <div className="flex justify-between items-start">
                       <div>
                         <p className="font-black text-lg leading-none">{log.products?.name}</p>
-                        {/* 🌟 แสดง ขนาด กับ Lot Date บรรทัดเดียวกัน */}
                         <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold text-slate-400 italic leading-none">
-                              {log.products?.height}x{log.products?.width}x{log.products?.length}
-                            </span>
-                            <span className="text-[9px] font-black text-slate-500 uppercase italic bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">
-                              Lot: {log.products?.received_date}
-                            </span>
+                            <span className="text-[10px] font-bold text-slate-400 italic leading-none">{log.products?.height}x{log.products?.width}x{log.products?.length}</span>
+                            <span className="text-[9px] font-black text-slate-500 uppercase italic bg-slate-100 px-1.5 py-0.5 rounded-md border border-slate-200">Lot: {log.products?.received_date}</span>
                         </div>
                       </div>
                       <span className={`font-black text-2xl ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
@@ -214,32 +217,39 @@ export default function ScanPage() {
           <div className="flex-1 flex flex-col relative bg-black">
             <div className={`${scanMethod === 'batch' ? 'h-[40%]' : 'h-full'} relative`}>
               <div id="reader" className="w-full h-full"></div>
-              <button onClick={stopScanner} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full shadow-xl"><X size={20}/></button>
+              {/* 🌟 Visual Feedback เมื่อเครื่องล็อค (หน่วงเวลา) */}
+              {isLocked && (
+                <div className="absolute inset-0 bg-green-500/20 flex items-center justify-center z-50 animate-pulse">
+                   <div className="bg-white/90 px-6 py-2 rounded-full shadow-2xl">
+                      <span className="text-green-600 font-black uppercase text-xs">SUCCESS!</span>
+                   </div>
+                </div>
+              )}
+              <button onClick={stopScanner} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full shadow-xl z-[60]"><X size={20}/></button>
             </div>
 
             {scanMethod === 'batch' && (
               <div className="flex-1 flex flex-col bg-slate-50 rounded-t-[2.5rem] mt-[-20px] z-10 shadow-2xl overflow-hidden text-slate-900">
                  <div className="p-5 flex justify-between items-center border-b border-slate-200">
-                    <span className="font-black uppercase text-xs italic">ในชุด ({basket.length})</span>
+                    <span className="font-black uppercase text-xs italic"><ShoppingCart className="inline mr-2 text-blue-500" size={16}/>ในชุด ({basket.length})</span>
                     {basket.length > 0 && (
-                      <button onClick={handleSaveBatch} disabled={isSaving} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center gap-2`}>
+                      <button onClick={handleSaveBatch} disabled={isSaving} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg`}>
                         {isSaving ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle2 size={14}/>} บันทึกทั้งหมด
                       </button>
                     )}
                  </div>
-                 <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                 <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-slate-100">
                    {basket.slice().reverse().map((item) => (
                       <div key={item.sku_15_digits} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex justify-between items-center">
                          <div className="flex-1">
                             <p className="font-black uppercase text-xs mb-1">{item.name}</p>
                             <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
-                            {/* 🌟 ขนาด + Lot ในบรรทัดเดียวกัน */}
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[9px] font-bold text-slate-400 italic">{item.height}x{item.width}x{item.length}</span>
-                                <span className="text-[8px] font-black text-slate-500 uppercase bg-slate-100 px-1 rounded-sm">LOT: {item.received_date}</span>
+                                <span className="text-[8px] font-black text-slate-500 uppercase bg-slate-100 px-1 rounded-sm border">LOT: {item.received_date}</span>
                             </div>
                          </div>
-                         <div className="flex items-center bg-slate-50 p-1 rounded-xl gap-2">
+                         <div className="flex items-center bg-slate-50 p-1 rounded-xl gap-2 border">
                             <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, -1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm"><Minus size={14}/></button>
                             <span className="font-black text-sm w-5 text-center">{item.amount}</span>
                             <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, 1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-blue-600 shadow-sm"><Plus size={14}/></button>
@@ -256,10 +266,9 @@ export default function ScanPage() {
                     <div className="mb-4 text-center">
                        <h2 className="text-xl font-black uppercase italic leading-none mb-2">{selectedProduct.name}</h2>
                        <SKUColored sku={selectedProduct.sku_15_digits} prefix={selectedProduct.prefix} />
-                       {/* 🌟 ขนาด + Lot ในบรรทัดเดียวกัน */}
                        <div className="flex items-center justify-center gap-2 mt-2">
                           <p className="text-[10px] font-bold text-slate-400 uppercase italic">ขนาด: {selectedProduct.height}x{selectedProduct.width}x{selectedProduct.length}</p>
-                          <p className="text-[10px] font-black text-blue-500 uppercase italic bg-blue-50 px-2 py-0.5 rounded-md">Lot: {selectedProduct.received_date}</p>
+                          <p className="text-[10px] font-black text-blue-500 uppercase italic bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">Lot: {selectedProduct.received_date}</p>
                        </div>
                     </div>
                     <div className="space-y-5">
