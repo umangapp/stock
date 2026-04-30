@@ -56,10 +56,25 @@ export default function ScanPage() {
     if (scannerRef.current) { await scannerRef.current.stop().catch(() => {}); scannerRef.current = null; setIsScanning(false); }
   }
 
-  const handleLookupProduct = async (sku: string, mode: 'receive' | 'issue') => {
-    const { data: p } = await supabase.from('products').select('*').eq('sku_15_digits', sku.trim().toUpperCase()).single()
-    if (!p) { alert("ไม่พบสินค้า"); return; }
-    setSelectedProduct(p); setScanMode(mode); setAmount(1); setNote(''); setShowActionModal(true);
+ const handleLookupProduct = async (sku: string, mode: 'receive' | 'issue') => {
+    // 🌟 แก้จาก .eq เป็น .ilike เพื่อให้หาเจอทั้งตัวเล็กและตัวใหญ่
+    const { data: p } = await supabase
+      .from('products')
+      .select('*')
+      .ilike('sku_15_digits', sku.trim()) 
+      .single()
+
+    if (!p) {
+      // เพิ่ม Alert บอกรหัสที่สแกนได้จริง เพื่อช่วย Check
+      alert(`❌ ไม่พบสินค้ารหัส: ${sku.trim()}\n(ตรวจสอบว่ามีรหัสนี้ในสต๊อกสินค้าแล้วหรือยัง)`);
+      return;
+    }
+    
+    setSelectedProduct(p); 
+    setScanMode(mode); 
+    setAmount(1); 
+    setNote(''); 
+    setShowActionModal(true);
   }
 
   const handleSaveTransaction = async () => {
