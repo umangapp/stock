@@ -49,10 +49,13 @@ export default function ScanPage() {
   const [activeUser, setActiveName] = useState('')
   const [personalLogs, setPersonalLogs] = useState<any[]>([])
   const [showHistory, setShowHistory] = useState(false)
+  
   const [scanMode, setScanMode] = useState<'receive' | 'issue' | null>(null)
   const [scanMethod, setScanMethod] = useState<'single' | 'batch' | null>(null)
   const [isScanning, setIsScanning] = useState(false)
   const [visualLock, setVisualLock] = useState(false)
+  const [scanInput, setScanInput] = useState('') // 🌟 คืนชีพตัวแปรที่หายไป 🌟
+  
   const [basket, setBasket] = useState<BasketItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
@@ -63,6 +66,19 @@ export default function ScanPage() {
 
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const isScanLocked = useRef(false)
+
+  const addToBasketLocal = (product: any) => {
+    setBasket(prev => {
+        const existingIndex = prev.findIndex(item => item.sku_15_digits === product.sku_15_digits);
+        if (existingIndex > -1) {
+            const updatedItem = { ...prev[existingIndex], amount: prev[existingIndex].amount + 1 };
+            const otherItems = prev.filter((_, i) => i !== existingIndex);
+            return [updatedItem, ...otherItems]; // ดันขึ้นบนสุด
+        } else {
+            return [{ ...product, amount: 1 }, ...prev]; // ใหม่ก็ไว้บนสุด
+        }
+    });
+  };
 
   const fetchData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -108,27 +124,12 @@ export default function ScanPage() {
     setIsScanning(false); setScanMode(null); setScanMethod(null);
   }
 
-  // --- 🌟 Logic แบบรัวๆ: ดันรายการล่าสุดขึ้นบนสุด 🌟 ---
   const handleBatchScan = async (sku: string) => {
     if (isScanLocked.current) return;
     isScanLocked.current = true;
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
-    
     if (p) {
-        playScanSound();
-        setBasket(prev => {
-            const existingIndex = prev.findIndex(item => item.sku_15_digits === p.sku_15_digits);
-            if (existingIndex > -1) {
-                // ถ้ามีอยู่แล้ว: ดึงออกมา บวดยอด แล้วเอาไปวางที่ Index 0 (บนสุด)
-                const updatedItem = { ...prev[existingIndex], amount: prev[existingIndex].amount + 1 };
-                const otherItems = prev.filter((_, i) => i !== existingIndex);
-                return [updatedItem, ...otherItems];
-            } else {
-                // ถ้ายังไม่มี: เอาสินค้าใหม่วางที่ Index 0 (บนสุด)
-                return [{ ...p, amount: 1 }, ...prev];
-            }
-        });
-        setVisualLock(true);
+        playScanSound(); addToBasketLocal(p); setVisualLock(true);
         setTimeout(() => { isScanLocked.current = false; setVisualLock(false); }, scanDelay);
     } else { isScanLocked.current = false; }
   }
@@ -136,7 +137,7 @@ export default function ScanPage() {
   const handleSingleScan = async (sku: string) => {
     if (isScanLocked.current) return;
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
-    if (!p) return;
+    if (!p) { alert("ไม่พบสินค้า"); isScanLocked.current = false; return; }
     isScanLocked.current = true; playScanSound();
     setSelectedProduct(p); setSingleAmount(1); setShowActionModal(true);
     if (scannerRef.current) await scannerRef.current.pause();
@@ -159,14 +160,6 @@ export default function ScanPage() {
     fetchData(); setShowSummaryModal(false); isScanLocked.current = false; if (scannerRef.current) scannerRef.current.resume();
   }
 
-  const handleOpenBatchSummary = () => {
-    if (scanMode === 'issue') {
-        const overStockItem = basket.find(item => item.amount > item.current_stock);
-        if (overStockItem) { alert(`❌ "${overStockItem.name}" สต๊อกไม่พอจ่าย!`); return; }
-    }
-    setShowBatchSummaryModal(true);
-  }
-
   const handleSaveBatch = async () => {
     setIsSaving(true);
     try {
@@ -184,7 +177,7 @@ export default function ScanPage() {
     setBasket(prev => prev.map(item => item.sku_15_digits === sku ? { ...item, amount: Math.max(1, item.amount + delta) } : item));
   };
 
-  if (loading) return <div className="h-screen bg-[#0a0f18] flex items-center justify-center text-blue-500 font-black italic uppercase tracking-tighter">Loading...</div>
+  if (loading) return <div className="h-screen bg-[#0a0f18] flex items-center justify-center text-blue-500 font-black italic uppercase tracking-tighter">Loading 1.1.1...</div>
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
@@ -196,7 +189,7 @@ export default function ScanPage() {
             </div>
             <p className="text-[8px] font-black text-slate-500 mt-1 ml-6 uppercase italic">Ver {appVersion}</p>
         </div>
-        <button onClick={() => setShowHistory(true)} className="bg-blue-600 px-5 py-2.5 rounded-full text-[11px] font-black uppercase shadow-lg active:scale-95 transition-all">ประวัติ</button>
+        <button onClick={() => setShowHistory(true)} className="bg-blue-600 px-5 py-2.5 rounded-full text-[11px] font-black uppercase shadow-lg">ประวัติ</button>
       </header>
 
       <div className="flex-1 relative flex flex-col overflow-hidden">
@@ -232,7 +225,10 @@ export default function ScanPage() {
                <button onClick={() => startScanner('issue', 'single')} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 border-b-4 border-slate-950 shadow-xl"><ScanLine size={40} className="text-red-400" /><span className="text-[11px] font-black uppercase italic leading-none text-center">นำออก<br/>(ทีละชิ้น)</span></button>
                <button onClick={() => startScanner('issue', 'batch')} className="aspect-square bg-red-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 active:scale-95 border-b-4 border-red-800 shadow-xl"><Zap size={40} className="text-white animate-pulse" /><span className="text-[11px] font-black uppercase italic leading-none text-center text-white">นำออก<br/>(ต่อเนื่อง)</span></button>
             </div>
-            <div className="relative"><input type="text" placeholder="ค้นหา/พิมพ์รหัส..." className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase text-sm shadow-inner" value={scanInput} onChange={(e) => setScanInput(e.target.value)} /><button onClick={() => handleSingleScan(scanInput)} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2"><Search size={24}/></button></div>
+            <div className="relative">
+                <input type="text" placeholder="ค้นหา/พิมพ์รหัส..." className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase text-sm shadow-inner" value={scanInput} onChange={(e) => setScanInput(e.target.value)} />
+                <button onClick={() => handleSingleScan(scanInput)} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2"><Search size={24}/></button>
+            </div>
           </main>
         ) : (
           <div className="flex-1 flex flex-col relative bg-black overflow-hidden">
@@ -243,26 +239,23 @@ export default function ScanPage() {
               </div>
               {visualLock && (
                 <div className="absolute inset-0 bg-green-500/30 flex items-center justify-center z-50 border-[10px] border-green-500 animate-in fade-in duration-100">
-                   <div className="bg-white px-8 py-3 rounded-full shadow-2xl flex items-center gap-3"><CheckCircle2 className="text-green-600" size={24}/><span className="text-green-600 font-black uppercase italic text-sm">SUCCESS!</span></div>
+                   <div className="bg-white px-8 py-3 rounded-full shadow-2xl flex items-center gap-3"><CheckCircle2 className="text-green-600" size={24}/><span className="text-green-600 font-black uppercase italic text-sm tracking-tighter">SUCCESS!</span></div>
                 </div>
               )}
               <button onClick={stopScanner} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full shadow-xl z-[60] active:scale-90"><X size={20}/></button>
             </div>
 
             {scanMethod === 'batch' && (
-              <div className="flex-1 flex flex-col bg-slate-50 rounded-t-[3rem] mt-[-30px] z-10 shadow-2xl overflow-hidden text-slate-900 animate-in slide-in-from-bottom duration-500">
+              <div className="flex-1 flex flex-col bg-slate-50 rounded-t-[3rem] mt-[-30px] z-10 shadow-2xl overflow-hidden text-slate-900">
                  <div className="p-6 flex justify-between items-center border-b border-slate-200 bg-white shrink-0">
-                    <div className="flex items-center gap-3"><div className="bg-blue-100 p-2 rounded-xl text-blue-600"><ShoppingCart size={20}/></div><span className="font-black uppercase text-sm italic">ในชุดสแกน ({basket.length})</span></div>
+                    <div className="flex items-center gap-3"><div className="bg-blue-100 p-2 rounded-xl text-blue-600"><ShoppingCart size={20}/></div><span className="font-black uppercase text-sm italic tracking-tight">ในชุดสแกน ({basket.length})</span></div>
                     {basket.length > 0 && (
-                      <button onClick={handleOpenBatchSummary} className={`${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} text-white px-6 py-3 rounded-2xl font-black uppercase text-[11px] flex items-center gap-2 shadow-lg active:scale-95 transition-all`}><CheckCircle2 size={16}/> ยืนยันบันทึก</button>
+                      <button onClick={() => setShowBatchSummaryModal(true)} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-6 py-3 rounded-2xl font-black uppercase text-[11px] flex items-center gap-2 shadow-lg active:scale-95 transition-all`}><CheckCircle2 size={16}/> ยืนยันบันทึก</button>
                     )}
                  </div>
                  <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
                    {basket.length === 0 ? (
-                     <div className="h-full flex flex-col items-center justify-center text-slate-300">
-                        <Zap size={48} className="mb-3 opacity-20" />
-                        <p className="text-[11px] font-black uppercase italic tracking-widest text-slate-400 text-center">เริ่มสแกนสินค้า<br/>รายการล่าสุดจะอยู่บนสุด</p>
-                     </div>
+                     <div className="h-full flex flex-col items-center justify-center text-slate-300"><Zap size={48} className="mb-3 opacity-20" /><p className="text-[11px] font-black uppercase italic tracking-widest text-slate-400 text-center">เริ่มสแกนสินค้า<br/>ล่าสุดจะอยู่บนสุด</p></div>
                    ) : (
                      basket.map((item, index) => (
                         <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2rem] border shadow-sm flex justify-between items-center shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
@@ -303,7 +296,7 @@ export default function ScanPage() {
                           <span className="text-5xl font-black italic">{singleAmount}</span>
                           <button onClick={() => setSingleAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center text-green-500 shadow-sm active:scale-90"><Plus size={28}/></button>
                       </div>
-                      <button onClick={handleConfirmSingle} className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic text-white shadow-xl shadow-blue-500/10 ${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} active:scale-95 transition-all`}>ตรวจสอบรายการ</button>
+                      <button onClick={handleConfirmSingle} className={`w-full py-6 rounded-[2rem] font-black text-xl uppercase italic text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} active:scale-95 transition-all`}>ตรวจสอบรายการ</button>
                       <button onClick={() => { setShowActionModal(false); isScanLocked.current = false; if (scannerRef.current) scannerRef.current.resume(); }} className="w-full py-2 text-[10px] font-black text-slate-300 uppercase text-center tracking-widest">ยกเลิก</button>
                     </div>
                  </div>
@@ -322,7 +315,6 @@ export default function ScanPage() {
                        <span className="bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-slate-600">LOT: {selectedProduct.received_date}</span>
                     </div>
                   </div>
-
                   <div className="space-y-4 mb-8">
                     <div className="flex justify-between border-b border-slate-100 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ประเภทรายการ</span><span className={`font-black text-[14px] uppercase ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}</span></div>
                     <div className="flex justify-between border-b border-slate-100 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">จำนวนสแกน</span><span className="font-black text-2xl text-slate-900 leading-none">{singleAmount} {selectedProduct.unit}</span></div>
@@ -331,47 +323,20 @@ export default function ScanPage() {
                       <div className="flex justify-between text-[18px] font-black mt-2 pt-2 border-t border-slate-200 italic"><span>สต๊อกใหม่:</span><span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? selectedProduct.current_stock + singleAmount : selectedProduct.current_stock - singleAmount}</span></div>
                     </div>
                   </div>
-
-                  <div className="flex gap-4">
-                    <button onClick={() => { setShowSummaryModal(false); setShowActionModal(true); }} className="flex-1 bg-slate-100 py-5 rounded-3xl font-black text-slate-400 uppercase text-[11px] shadow-sm active:scale-95">แก้ไข</button>
-                    <button onClick={handleSaveSingle} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} transition-all active:scale-95`}>ยืนยันบันทึก</button>
-                  </div>
+                  <div className="flex gap-4"><button onClick={() => { setShowSummaryModal(false); setShowActionModal(true); }} className="flex-1 bg-slate-100 py-5 rounded-3xl font-black text-slate-400 uppercase text-[11px] shadow-sm active:scale-95 transition-all">แก้ไข</button><button onClick={handleSaveSingle} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} transition-all active:scale-95`}>ยืนยันบันทึก</button></div>
                 </div>
               </div>
             )}
 
             {showBatchSummaryModal && (
-              <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-2xl z-[500] flex items-center justify-center p-4 text-slate-900">
+              <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-2xl z-[500] flex items-center justify-center p-4 text-slate-900 animate-in fade-in duration-300">
                 <div className="bg-white w-full max-w-md rounded-[3rem] p-8 shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
-                  <div className="flex flex-col items-center text-center mb-6 shrink-0">
-                     <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}><CheckCircle2 size={40} /></div>
-                     <h3 className="text-2xl font-black uppercase italic text-slate-900 leading-none">สรุปรายการชุด</h3>
-                     <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">ทั้งหมด {basket.length} รายการ</p>
-                  </div>
-
+                  <div className="flex flex-col items-center text-center mb-6 shrink-0"><div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${scanMode === 'receive' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}><CheckCircle2 size={40} /></div><h3 className="text-2xl font-black uppercase italic text-slate-900 leading-none">สรุปรายการชุด</h3><p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">ทั้งหมด {basket.length} รายการ</p></div>
                   <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
                     {basket.map((item) => (
-                      <div key={item.sku_15_digits} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex justify-between items-center">
-                         <div className="flex-1">
-                            <p className="font-black text-xs uppercase text-slate-800 mb-1 leading-none">{item.name}</p>
-                            <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
-                            <p className="text-[9px] font-bold text-slate-400 mt-1 italic uppercase leading-none">
-                               เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span>
-                            </p>
-                         </div>
-                         <div className="text-right ml-4 shrink-0">
-                            <span className={`text-2xl font-black leading-none ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'} {item.amount}</span>
-                         </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="flex gap-4 shrink-0">
-                    <button onClick={() => setShowBatchSummaryModal(false)} className="flex-1 bg-slate-100 py-5 rounded-3xl font-black text-slate-500 uppercase text-xs shadow-sm active:scale-95">กลับไปแก้</button>
-                    <button onClick={handleSaveBatch} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl flex items-center justify-center gap-2 ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 transition-all`}>
-                      {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} ยืนยันบันทึก
-                    </button>
-                  </div>
+                      <div key={item.sku_15_digits} className="bg-slate-50 p-4 rounded-3xl border border-slate-100 flex justify-between items-center"><div className="flex-1"><p className="font-black text-xs uppercase text-slate-800 mb-1 leading-none">{item.name}</p><SKUColored sku={item.sku_15_digits} prefix={item.prefix} /><p className="text-[9px] font-bold text-slate-400 mt-1 italic uppercase leading-none">เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span></p></div><div className="text-right ml-4 shrink-0"><span className={`text-2xl font-black leading-none ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'} {item.amount}</span></div></div>
+                    ))}</div>
+                  <div className="flex gap-4 shrink-0"><button onClick={() => setShowBatchSummaryModal(false)} className="flex-1 bg-slate-100 py-5 rounded-3xl font-black text-slate-500 uppercase text-xs shadow-sm active:scale-95">กลับไปแก้</button><button onClick={handleSaveBatch} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl flex items-center justify-center gap-2 ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 transition-all`}>{isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} ยืนยันบันทึก</button></div>
                 </div>
               </div>
             )}
