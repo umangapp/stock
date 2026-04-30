@@ -76,16 +76,17 @@ const fetchData = async () => {
 
         const importData = rows.map(row => {
           if (!row[0]) return null
-          const pData = {
-            name: String(row[0]).trim(),
-            prefix: String(row[1] || 'XXX').trim().toUpperCase(),
-            width: String(row[2] || '').trim(),
-            height: String(row[3] || '').trim(),
-            length: String(row[4] || '').trim(),
-            received_date: String(row[5] || '').trim(),
-            unit: String(row[6] || '').trim(),
-            current_stock: Number(row[7] || 0)
-          }
+     
+      const pData = {
+          name: String(row[0]).trim(),
+          prefix: String(row[1] || 'XXX').trim().toUpperCase(),
+          height: String(row[2] || '').trim(), // 🌟 คอลัมน์ที่ 3 ใน Excel ต้องเป็น "หนา"
+          width: String(row[3] || '').trim(),  // 🌟 คอลัมน์ที่ 4 ใน Excel ต้องเป็น "กว้าง"
+          length: String(row[4] || '').trim(),
+          received_date: String(row[5] || '').trim(),
+          unit: String(row[6] || '').trim(),
+          current_stock: Number(row[7] || 0)
+        }
           return { ...pData, sku_15_digits: generateSKU(pData) }
         }).filter(Boolean)
 
