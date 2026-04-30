@@ -31,13 +31,18 @@ export default function AdminDashboard() {
 
 const fetchData = async () => {
     setLoading(true)
-    // 1. ดึงประวัติธุรกรรมทั้งหมด
+    
+    // 1. ดึงประวัติธุรกรรม
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
     
-    // 2. ดึงสินค้าทั้งหมด (แก้ไขบรรทัดที่มีปัญหาตรงนี้ครับ)
-    const { data: p } = await supabase.from('products').select('*').order('name') 
+    // 2. ดึงสินค้า และเรียงตาม ขนาด (กว้าง > หนา > ยาว) จากน้อยไปมาก
+    const { data: p } = await supabase.from('products')
+      .select('*')
+      .order('width', { ascending: true })
+      .order('height', { ascending: true })
+      .order('length', { ascending: true })
     
-    // 3. ดึงข้อมูลมาสเตอร์
+    // 3. ดึงข้อมูลมาสเตอร์อื่นๆ
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
     
