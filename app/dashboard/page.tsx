@@ -31,7 +31,39 @@ export default function AdminDashboard() {
   const [newProduct, setNewProduct] = useState({ 
     name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0 
   })
+const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
+  if (!sku) return null;
+  const preLen = prefix?.length || 2;
+  const paddingMatch = sku.match(/x+$/);
+  const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  
+  const p1 = sku.substring(0, preLen);
+  const p4 = sku.substring(sku.length - paddingLen);
+  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
+  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
 
+  // ถ้าเป็นโหมดมืด (ใน Preview Box) ใช้สีสว่าง
+  const colors = isDark ? {
+    pre: "text-blue-400",
+    dim: "text-green-400",
+    lot: "text-orange-400",
+    pad: "text-cyan-300"
+  } : {
+    pre: "text-blue-600",
+    dim: "text-green-600",
+    lot: "text-orange-500",
+    pad: "text-cyan-500"
+  };
+
+  return (
+    <span className="font-mono font-black tracking-widest uppercase italic">
+      <span className={colors.pre}>{p1}</span>
+      <span className={colors.dim}>{p2}</span>
+      <span className={colors.lot}>{p3}</span>
+      <span className={colors.pad}>{p4}</span>
+    </span>
+  );
+};
   const fetchData = async () => {
     setLoading(true)
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
@@ -169,6 +201,9 @@ export default function AdminDashboard() {
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
+            <div className="bg-blue-50/50 p-2 rounded-lg">
+              <SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.entries(groupedByUser).map(([user, logs]: [string, any]) => (
                 <div key={user} className="bg-white rounded-[2.5rem] border overflow-hidden h-fit transition-all hover:shadow-xl shadow-sm border-slate-200">
@@ -220,6 +255,7 @@ export default function AdminDashboard() {
                   <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg shadow-blue-500/20 active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
                </div>
             </div>
+            
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
                 <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400">
@@ -235,6 +271,9 @@ export default function AdminDashboard() {
               <p className="text-lg font-mono font-black text-blue-600 tracking-wider italic">{item.sku_15_digits}</p>
               <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">
               ขนาด: {item.height} x {item.width} x {item.length} มม.
+              </p>
+              <p className="text-lg leading-none mb-1">
+                <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} />
               </p>
               <p className="font-black text-2xl text-slate-900 leading-none">
             {item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span>
@@ -331,6 +370,13 @@ export default function AdminDashboard() {
               <div className="bg-slate-900 p-8 rounded-[2rem] text-center border-2 border-blue-500/30 shadow-2xl relative overflow-hidden">
                  <p className="relative text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 italic">Preview SKU (หนา-กว้าง2-ยาว2-วันที่)</p>
                  <p className="relative text-3xl font-mono font-black text-blue-100 tracking-widest uppercase italic leading-none">{generateSKU(isAddModalOpen ? newProduct : editingProduct)}</p>
+              <p className="relative text-3xl leading-none">
+                <SKUColoredAdmin 
+                  sku={generateSKU(isAddModalOpen ? newProduct : editingProduct)} 
+                  prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
+                  isDark={true} 
+                />
+              </p>
               </div>
               <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl shadow-blue-500/30 active:scale-95 transition-all">บันทึกข้อมูลสินค้า</button>
             </form>
