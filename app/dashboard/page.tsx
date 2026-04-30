@@ -53,24 +53,34 @@ export default function AdminDashboard() {
     fileInputRef.current?.click() // สั่งเปิดหน้าต่างเลือกไฟล์
   }
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     const reader = new FileReader()
     reader.onload = async (event) => {
       const text = event.target?.result as string
-      const rows = text.split('\n').slice(1) // ตัด Header ออกเอาแค่ข้อมูล
+      const rows = text.split('\n').slice(1) // ตัด Header
       
       const importData = rows.map(row => {
-        const [name, width, height, length, received_date, unit, current_stock] = row.split(',')
-        if (!name) return null
+        const columns = row.split(',')
+        if (columns.length < 7) return null
         
-        // หา Prefix จาก Master Data
-        const matched = masterProducts.find(m => m.name.trim() === name.trim())
-        const prefix = matched ? matched.prefix : 'XXX'
+        // เรียงตามไฟล์ V2: ชื่อ, ตัวย่อ, กว้าง, หนา, ยาว, วันที่, หน่วย, สต๊อก
+        const [name, prefix, width, height, length, received_date, unit, current_stock] = columns
+        
+        const pData = { 
+          name: name?.trim(), 
+          prefix: prefix?.trim()?.toUpperCase() || 'XXX', 
+          width: width?.trim(), 
+          height: height?.trim(), 
+          length: length?.trim(), 
+          received_date: received_date?.trim(), 
+          unit: unit?.trim(), 
+          current_stock: Number(current_stock?.trim() || 0) 
+        }
 
-        const pData = { name, prefix, width, height, length, received_date, unit, current_stock: Number(current_stock) }
+        // ให้ระบบเจน SKU 15 หลักให้จากข้อมูลที่นำเข้า
         return { ...pData, sku_15_digits: generateSKU(pData) }
       }).filter(Boolean)
 
@@ -78,7 +88,7 @@ export default function AdminDashboard() {
         const { error } = await supabase.from('products').insert(importData)
         if (error) alert("Import ผิดพลาด: " + error.message)
         else {
-          alert(`✅ นำเข้าข้อมูลสำเร็จ ${importData.length} รายการ`);
+          alert(`✅ นำเข้าข้อมูลสำเร็จ ${importData.length} รายการ (รหัส SKU ถูกเจนให้อัตโนมัติแล้ว)`);
           fetchData()
         }
       }
