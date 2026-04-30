@@ -3,36 +3,23 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { generateSKU } from '@/lib/skuHelper'
+import { APP_VERSION_FALLBACK } from '@/lib/version'
 import * as XLSX from 'xlsx'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
-  ChevronDown, ChevronUp, Clock, TrendingUp, Edit3, Plus, Trash2, X, FileSpreadsheet, AlertCircle 
+  ChevronDown, ChevronUp, Clock, TrendingUp, Edit3, Plus, Trash2, X, FileSpreadsheet, AlertCircle, Info
 } from 'lucide-react'
 
-// 🌟 ฟังก์ชันแยกสี SKU สำหรับ Admin
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
   const preLen = prefix?.length || 2;
   const paddingMatch = sku.match(/x+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
-
-  const colors = isDark ? {
-    pre: "text-blue-400",
-    dim: "text-green-400",
-    lot: "text-orange-400",
-    pad: "text-cyan-300"
-  } : {
-    pre: "text-blue-600",
-    dim: "text-green-600",
-    lot: "text-orange-500",
-    pad: "text-cyan-500"
-  };
-
+  const colors = isDark ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-cyan-300" } : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-cyan-500" };
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -53,40 +40,43 @@ export default function AdminDashboard() {
   const [masterUnits, setMasterUnits] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
+  const [appVersion, setAppVersion] = useState(APP_VERSION_FALLBACK)
+  const [newVersionInput, setNewVersionInput] = useState('')
   const [expandedUsers, setExpandedUsers] = useState<string[]>([])
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
   
   const [inputName, setInputName] = useState('')
   const [inputPrefix, setInputPrefix] = useState('')
   const [inputUnit, setInputUnit] = useState('')
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [newProduct, setNewProduct] = useState({ 
-    name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0 
-  })
+  const [newProduct, setNewProduct] = useState({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0 })
 
   const fetchData = async () => {
     setLoading(true)
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
-    const { data: p } = await supabase.from('products').select('*')
-      .order('height', { ascending: true })
-      .order('width', { ascending: true })
-      .order('length', { ascending: true })
+    const { data: p } = await supabase.from('products').select('*').order('height', { ascending: true }).order('width', { ascending: true }).order('length', { ascending: true })
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
+    const { data: ver } = await supabase.from('settings_app_config').select('version').single()
+    
     if (t) setTransactions(t)
     if (p) setProducts(p)
     if (mp) setMasterProducts(mp)
     if (mu) setMasterUnits(mu)
+    if (ver) { setAppVersion(ver.version); setNewVersionInput(ver.version); }
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
 
-  const handleImportClick = () => fileInputRef.current?.click()
+  const updateVersion = async () => {
+    const { error } = await supabase.from('settings_app_config').update({ version: newVersionInput }).eq('id', 1)
+    if (!error) { setAppVersion(newVersionInput); alert("✅ อัปเดตเวอร์ชั่นโปรแกรมแล้ว"); }
+  }
 
+  const handleImportClick = () => fileInputRef.current?.click()
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -101,16 +91,7 @@ export default function AdminDashboard() {
         const rows = jsonData.slice(1)
         const importData = rows.map(row => {
           if (!row[0]) return null
-          const pData = {
-            name: String(row[0]).trim(),
-            prefix: String(row[1] || 'XXX').trim().toUpperCase(),
-            height: String(row[2] || '').trim(),
-            width: String(row[3] || '').trim(),
-            length: String(row[4] || '').trim(),
-            received_date: String(row[5] || '').trim(),
-            unit: String(row[6] || '').trim(),
-            current_stock: Number(row[7] || 0)
-          }
+          const pData = { name: String(row[0]).trim(), prefix: String(row[1] || 'XXX').trim().toUpperCase(), height: String(row[2] || '').trim(), width: String(row[3] || '').trim(), length: String(row[4] || '').trim(), received_date: String(row[5] || '').trim(), unit: String(row[6] || '').trim(), current_stock: Number(row[7] || 0) }
           return { ...pData, sku_15_digits: generateSKU(pData) }
         }).filter(Boolean)
         if (importData.length > 0) {
@@ -131,23 +112,20 @@ export default function AdminDashboard() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (Number(newProduct.current_stock) < 0) { alert("❌ สต๊อกห้ามติดลบ"); return; }
     const { error } = await supabase.from('products').insert([{ ...newProduct, sku_15_digits: generateSKU(newProduct), current_stock: Number(newProduct.current_stock) }])
     if (!error) { setIsAddModalOpen(false); fetchData(); }
   }
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (Number(editingProduct.current_stock) < 0) { alert("❌ สต๊อกห้ามติดลบ"); return; }
     const { error } = await supabase.from('products').update({ ...editingProduct, sku_15_digits: generateSKU(editingProduct), current_stock: Number(editingProduct.current_stock) }).eq('id', editingProduct.id)
     if (!error) { setIsEditModalOpen(false); fetchData(); }
   }
 
   const deleteProduct = async (id: string) => {
-    if (!confirm("⚠️ ยืนยันการลบสินค้าและประวัติทั้งหมด?")) return;
+    if (!confirm("⚠️ ยืนยันการลบ?")) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) alert("ลบไม่สำเร็จ: " + error.message);
-    else fetchData();
+    if (!error) fetchData();
   }
 
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
@@ -169,7 +147,11 @@ export default function AdminDashboard() {
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
       
       <nav className="w-full lg:w-72 bg-slate-900 text-white p-6 flex lg:flex-col gap-2 shrink-0 z-20 shadow-2xl">
-        <h1 className="hidden lg:block mb-10 text-2xl text-blue-400 font-black italic uppercase tracking-tighter">Umang Admin</h1>
+        <div className="mb-10">
+            <h1 className="text-2xl text-blue-400 font-black italic uppercase tracking-tighter">Umang Admin</h1>
+            {/* 🌟 แสดงเลขเวอร์ชั่นใน Dashboard Sidebar */}
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-1">Version {appVersion}</p>
+        </div>
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
           {[{ id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard }, { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package }, { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
@@ -181,8 +163,6 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
-        
-        {/* --- TAB: DASHBOARD --- */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -194,26 +174,19 @@ export default function AdminDashboard() {
                     {expandedUsers.includes(user) ? <ChevronUp size={24}/> : <ChevronDown size={24}/>}
                   </div>
                   {expandedUsers.includes(user) && (
-                    <div className="p-4 bg-slate-50 space-y-4 max-h-[600px] overflow-y-auto text-slate-900">
+                    <div className="p-4 bg-slate-50 space-y-4 max-h-[600px] overflow-y-auto">
                       {logs.map((log: any) => (
                         <div key={log.id} className="bg-white p-5 rounded-3xl border shadow-sm flex flex-col gap-3">
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                                 <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase leading-none">
-                                  ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.
-                                </p>
-                                <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase italic">
-                                  Lot Date: {log.products?.received_date}
-                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase leading-none">ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.</p>
+                                <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase italic">Lot Date: {log.products?.received_date}</p>
                             </div>
                             <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
                           </div>
                           <div className="flex items-center gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                            <TrendingUp size={16} className="text-blue-500" />
-                            <p className="text-sm font-black text-slate-700 uppercase">
-                               สต๊อก: {log.old_stock || 0} {log.type === 'receive' ? '+' : '-'} {log.amount} = <span className="text-blue-600">{log.new_stock || 0}</span>
-                            </p>
+                            <TrendingUp size={16} className="text-blue-500" /><p className="text-sm font-black text-slate-700 uppercase">สต๊อก: {log.old_stock || 0} {log.type === 'receive' ? '+' : '-'} {log.amount} = <span className="text-blue-600">{log.new_stock || 0}</span></p>
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg">
                             <SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
@@ -228,7 +201,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB: INVENTORY --- */}
         {activeTab === 'inventory' && (
           <div className="space-y-8 animate-in fade-in">
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
@@ -241,8 +213,8 @@ export default function AdminDashboard() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
-                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400 text-slate-800">
-                  <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
+                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400">
+                  <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center text-slate-800">
                     <div className="flex-1 pr-4">
                       <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
@@ -257,21 +229,14 @@ export default function AdminDashboard() {
                       {group.items.map((item: any) => (
                         <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm">
                           <div className="flex-1">
-                            <div className="mb-1 leading-none">
-                              <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} />
-                            </div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">
-                              ขนาด: {item.height} x {item.width} x {item.length} มม.
-                            </p>
-                            {/* 🌟 เพิ่ม Lot Date ตรงนี้ในหน้า Inventory 🌟 */}
-                            <p className="text-[9px] font-black text-slate-500 mt-1 uppercase italic mb-2">
-                              Lot Date: {item.received_date}
-                            </p>
+                            <div className="mb-1 leading-none"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">ขนาด: {item.height} x {item.width} x {item.length} มม.</p>
+                            <p className="text-[9px] font-black text-slate-500 mt-1 uppercase italic mb-2">Lot Date: {item.received_date}</p>
                             <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0 ml-4">
-                             <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
-                             <button onClick={() => deleteProduct(item.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
+                             <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white shadow-sm"><Edit3 size={18}/></button>
+                             <button onClick={() => deleteProduct(item.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white shadow-sm"><Trash2 size={18}/></button>
                           </div>
                         </div>
                       ))}
@@ -283,19 +248,42 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* --- TAB: SETTINGS --- */}
         {activeTab === 'settings' && (
-           <div className="space-y-8 animate-in fade-in text-slate-800">
+           <div className="space-y-8 animate-in fade-in">
              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">System Settings</h2>
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+             
+             {/* 🌟 ส่วนแก้ไขเวอร์ชั่นโปรแกรม 🌟 */}
+             <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl text-white mb-8">
+               <h4 className="font-black uppercase text-sm mb-6 text-blue-400 tracking-widest flex items-center gap-2">
+                 <Info size={18}/> เวอร์ชั่นโปรแกรม (App Version)
+               </h4>
+               <div className="flex flex-col sm:flex-row gap-4">
+                 <input 
+                   type="text" 
+                   className="flex-1 bg-white/5 p-5 rounded-2xl outline-none border border-white/10 focus:border-blue-500 font-black text-xl" 
+                   placeholder="เช่น 1.0.5" 
+                   value={newVersionInput} 
+                   onChange={e => setNewVersionInput(e.target.value)} 
+                 />
+                 <button 
+                   onClick={updateVersion} 
+                   className="bg-blue-600 text-white px-10 py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-all"
+                 >
+                   บันทึกเวอร์ชั่นใหม่
+                 </button>
+               </div>
+               <p className="text-[10px] font-bold text-slate-500 mt-4 uppercase italic">เลขเวอร์ชั่นนี้จะแสดงในหน้าหลักของ Admin และหน้า Scan ของพนักงาน</p>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 text-slate-800">
                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                  <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า</h4>
                  <div className="flex flex-col sm:flex-row gap-3 mb-6">
                    <input type="text" className="flex-[2] bg-slate-50 p-4 rounded-2xl outline-none border focus:border-blue-500 font-bold" placeholder="ชื่อสินค้าหลัก" value={inputName} onChange={e => setInputName(e.target.value)} />
                    <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl outline-none border focus:border-blue-500 font-black uppercase text-blue-600 text-center" placeholder="ตัวย่อ" maxLength={3} value={inputPrefix} onChange={e => setInputPrefix(e.target.value)} />
-                   <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition-all"><Plus/></button>
+                   <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
                  </div>
-                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold text-slate-900">
+                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold">
                    {masterProducts.map(item => (
                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
                        <span>{item.name} <span className="text-blue-600 ml-2">[{item.prefix}]</span></span>
@@ -308,9 +296,9 @@ export default function AdminDashboard() {
                  <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">จัดการหน่วยนับ</h4>
                  <div className="flex gap-3 mb-6">
                    <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl outline-none border focus:border-blue-500 font-bold" placeholder="หน่วยนับ..." value={inputUnit} onChange={e => setInputUnit(e.target.value)} />
-                   <button onClick={() => { supabase.from('settings_units').insert([{unit: inputUnit}]).then(() => {setInputUnit(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition-all"><Plus/></button>
+                   <button onClick={() => { supabase.from('settings_units').insert([{unit: inputUnit}]).then(() => {setInputUnit(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
                  </div>
-                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black text-slate-900">
+                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black">
                    {masterUnits.map(item => (
                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
                        <span>{item.unit}</span>
@@ -324,7 +312,6 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- MODALS --- */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 text-slate-800">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
@@ -333,31 +320,25 @@ export default function AdminDashboard() {
               <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-100 rounded-full text-slate-400"><X/></button>
             </div>
             <form onSubmit={isAddModalOpen ? handleAddProduct : handleUpdateProduct} className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-slate-900">
                 <div className="col-span-full">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ชื่อสินค้าหลัก</label>
-                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none focus:border-blue-500 font-bold text-slate-900" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => handleNameSelect(e.target.value, isAddModalOpen)}>
+                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none focus:border-blue-500 font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => handleNameSelect(e.target.value, isAddModalOpen)}>
                     <option value="">-- เลือกชื่อสินค้า --</option>
                     {masterProducts.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                   </select>
                 </div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อ</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 uppercase text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
-                <div><label className="text-[10px] font-black uppercase text-orange-600 underline ml-2 italic">หนา (mm)</label><input type="number" required step="any" className="w-full bg-orange-50 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">กว้าง (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-blue-600 underline ml-2 italic">ยาว (mm)</label><input type="number" required step="any" className="w-full bg-blue-50/30 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-center text-slate-900" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none font-bold text-slate-900" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
+                <div><label className="text-[10px] font-black uppercase text-orange-600 underline ml-2 italic">หนา (mm)</label><input type="number" required step="any" className="w-full bg-orange-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">กว้าง (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-blue-600 underline ml-2 italic">ยาว (mm)</label><input type="number" required step="any" className="w-full bg-blue-50/30 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-center" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
                 <div className="bg-blue-50 rounded-2xl p-4 col-span-1 shadow-inner border border-blue-100"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label><input type="number" required className="w-full bg-transparent outline-none font-black text-2xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
               </div>
               <div className="bg-slate-900 p-8 rounded-[2rem] text-center border-2 border-blue-500/30 shadow-2xl relative overflow-hidden">
                  <p className="relative text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 italic">Preview SKU (หนา-กว้าง2-ยาว2-วันที่)</p>
-                 <div className="relative text-3xl leading-none">
-                   <SKUColoredAdmin 
-                     sku={generateSKU(isAddModalOpen ? newProduct : editingProduct)} 
-                     prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
-                     isDark={true} 
-                   />
-                 </div>
+                 <div className="relative text-3xl leading-none"><SKUColoredAdmin sku={generateSKU(isAddModalOpen ? newProduct : editingProduct)} prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} isDark={true} /></div>
               </div>
               <button type="submit" className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl active:scale-95 transition-all">บันทึกข้อมูลสินค้า</button>
             </form>
