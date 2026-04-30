@@ -182,6 +182,7 @@ export default function AdminDashboard() {
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         
+        {/* --- TAB: DASHBOARD --- */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -199,7 +200,7 @@ export default function AdminDashboard() {
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                                 <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase">
+                                <p className="text-[10px] font-bold text-slate-400 mt-2 italic uppercase leading-none">
                                   ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.
                                 </p>
                                 <p className="text-[9px] font-black text-slate-500 mt-1.5 uppercase italic">
@@ -227,6 +228,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* --- TAB: INVENTORY --- */}
         {activeTab === 'inventory' && (
           <div className="space-y-8 animate-in fade-in">
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
@@ -241,7 +243,6 @@ export default function AdminDashboard() {
               {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
                 <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400 text-slate-800">
                   <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
-                    {/* 🌟 จุดที่แก้: ชื่อสินค้าขยาย flex-1 🌟 */}
                     <div className="flex-1 pr-4">
                       <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
@@ -259,7 +260,13 @@ export default function AdminDashboard() {
                             <div className="mb-1 leading-none">
                               <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} />
                             </div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">ขนาด: {item.height} x {item.width} x {item.length} มม.</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase leading-none">
+                              ขนาด: {item.height} x {item.width} x {item.length} มม.
+                            </p>
+                            {/* 🌟 เพิ่ม Lot Date ตรงนี้ในหน้า Inventory 🌟 */}
+                            <p className="text-[9px] font-black text-slate-500 mt-1 uppercase italic mb-2">
+                              Lot Date: {item.received_date}
+                            </p>
                             <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
                           </div>
                           <div className="flex flex-col gap-2 shrink-0 ml-4">
@@ -288,7 +295,7 @@ export default function AdminDashboard() {
                    <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl outline-none border focus:border-blue-500 font-black uppercase text-blue-600 text-center" placeholder="ตัวย่อ" maxLength={3} value={inputPrefix} onChange={e => setInputPrefix(e.target.value)} />
                    <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition-all"><Plus/></button>
                  </div>
-                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold">
+                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold text-slate-900">
                    {masterProducts.map(item => (
                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
                        <span>{item.name} <span className="text-blue-600 ml-2">[{item.prefix}]</span></span>
@@ -303,11 +310,11 @@ export default function AdminDashboard() {
                    <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl outline-none border focus:border-blue-500 font-bold" placeholder="หน่วยนับ..." value={inputUnit} onChange={e => setInputUnit(e.target.value)} />
                    <button onClick={() => { supabase.from('settings_units').insert([{unit: inputUnit}]).then(() => {setInputUnit(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95 transition-all"><Plus/></button>
                  </div>
-                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black">
+                 <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black text-slate-900">
                    {masterUnits.map(item => (
                      <div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm">
                        <span>{item.unit}</span>
-                       <button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_units').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2 hover:bg-red-50 rounded-lg transition-all"><Trash2 size={18}/></button>
+                       <button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_units').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button>
                      </div>
                    ))}
                  </div>
@@ -317,7 +324,7 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* --- MODAL: ADD / EDIT PRODUCT --- */}
+      {/* --- MODALS --- */}
       {(isAddModalOpen || isEditModalOpen) && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 text-slate-800">
           <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
@@ -335,16 +342,13 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อ</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 uppercase text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
-                
                 <div><label className="text-[10px] font-black uppercase text-orange-600 underline ml-2 italic">หนา (mm)</label><input type="number" required step="any" className="w-full bg-orange-50 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 italic">กว้าง (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-blue-600 underline ml-2 italic">ยาว (mm)</label><input type="number" required step="any" className="w-full bg-blue-50/30 p-4 rounded-2xl border font-black shadow-sm text-slate-900" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
-                
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (YYMMDD)</label><input type="text" required maxLength={6} className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-center text-slate-900" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none font-bold text-slate-900" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
                 <div className="bg-blue-50 rounded-2xl p-4 col-span-1 shadow-inner border border-blue-100"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label><input type="number" required className="w-full bg-transparent outline-none font-black text-2xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
               </div>
-              
               <div className="bg-slate-900 p-8 rounded-[2rem] text-center border-2 border-blue-500/30 shadow-2xl relative overflow-hidden">
                  <p className="relative text-[10px] font-black text-blue-400 uppercase tracking-widest mb-2 italic">Preview SKU (หนา-กว้าง2-ยาว2-วันที่)</p>
                  <div className="relative text-3xl leading-none">
