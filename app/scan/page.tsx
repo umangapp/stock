@@ -7,7 +7,7 @@ import { APP_VERSION_FALLBACK } from '@/lib/version'
 import { addToBasket, updateBasketQty, BasketItem } from '@/lib/scanActions'
 import { 
   QrCode, X, Search, ArrowDownCircle, ArrowUpCircle, 
-  Plus, Minus, Trash2, CheckCircle2, ShoppingCart, Loader2, Zap, ScanLine, Clock, User, FileText, TrendingUp
+  Plus, Minus, Trash2, CheckCircle2, ShoppingCart, Loader2, Zap, Clock, User, TrendingUp
 } from 'lucide-react'
 
 // --- ฟังก์ชันแยกสี SKU (ST-ขนาด-Lot-x) ---
@@ -40,12 +40,10 @@ export default function ScanPage() {
   const [isScanning, setIsScanning] = useState(false)
   const [scanInput, setScanInput] = useState('')
   
-  // States สำหรับแบบใหม่ (Batch)
   const [basket, setBasket] = useState<BasketItem[]>([])
   const [isSaving, setIsSaving] = useState(false)
   const [lastScannedSku, setLastScannedSku] = useState('')
 
-  // States สำหรับแบบเดิม (Single)
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [singleAmount, setSingleAmount] = useState(1)
   const [singleNote, setSingleNote] = useState('')
@@ -130,13 +128,11 @@ export default function ScanPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
-      
-      {/* HEADER (คืนชีพดีไซน์เดิม) */}
       <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-[110]">
         <div className="flex flex-col">
             <div className="flex items-center gap-2">
                 <QrCode className="text-blue-500" size={18} />
-                <h1 className="text-xs font-black uppercase italic text-blue-400">Scan Center</h1>
+                <h1 className="text-xs font-black uppercase italic text-blue-400 leading-none">Scan Center</h1>
             </div>
             <p className="text-[8px] font-black text-slate-500 mt-1 ml-6 uppercase">Ver {appVersion}</p>
         </div>
@@ -144,8 +140,6 @@ export default function ScanPage() {
       </header>
 
       <div className="flex-1 relative flex flex-col">
-        
-        {/* HISTORY OVERLAY (แบบ V1.0.0) */}
         {showHistory && (
           <div className="absolute inset-0 bg-[#0a0f18] z-[120] p-6 overflow-y-auto animate-in slide-in-from-right duration-300 text-slate-900">
              <div className="max-w-md mx-auto space-y-6 pb-20">
@@ -172,10 +166,7 @@ export default function ScanPage() {
         )}
 
         {!isScanning ? (
-          /* 🌟 หน้าแรก: คืนชีพหน้าจอ V1.0.0 🌟 */
           <main className="flex-1 p-6 flex flex-col gap-6 justify-center max-w-sm mx-auto w-full">
-            
-            {/* นำเข้าสินค้า (เลือกได้ 2 แบบ) */}
             <div className="flex flex-col gap-2">
                <button onClick={() => startScanner('receive', 'single')} className="bg-green-600 h-32 rounded-[2.5rem] flex flex-col items-center justify-center gap-2 active:scale-95 border-b-8 border-green-800 shadow-xl">
                   <ArrowDownCircle size={40} /><span className="text-xl font-black uppercase italic">นำเข้าสินค้า (+)</span>
@@ -184,8 +175,6 @@ export default function ScanPage() {
                   <Zap size={14} className="animate-pulse"/> สแกนต่อเนื่อง (Turbo Mode)
                </button>
             </div>
-
-            {/* นำออกสินค้า (เลือกได้ 2 แบบ) */}
             <div className="flex flex-col gap-2">
                <button onClick={() => startScanner('issue', 'single')} className="bg-red-600 h-32 rounded-[2.5rem] flex flex-col items-center justify-center gap-2 active:scale-95 border-b-8 border-red-800 shadow-xl">
                   <ArrowUpCircle size={40} /><span className="text-xl font-black uppercase italic">นำออกสินค้า (-)</span>
@@ -194,34 +183,24 @@ export default function ScanPage() {
                   <Zap size={14} className="animate-pulse"/> สแกนต่อเนื่อง (Turbo Mode)
                </button>
             </div>
-
-            {/* ช่องพิมพ์รหัส Manual (แบบเดิม) */}
             <div className="mt-4 relative">
-               <input 
-                  type="text" 
-                  placeholder="พิมพ์รหัส 15 หลัก..." 
-                  className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase" 
-                  value={scanInput} 
-                  onChange={(e) => setScanInput(e.target.value)} 
-               />
+               <input type="text" placeholder="พิมพ์รหัส 15 หลัก..." className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase" value={scanInput} onChange={(e) => setScanInput(e.target.value)} />
                <button onClick={() => handleSingleScan(scanInput)} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2"><Search size={24}/></button>
             </div>
           </main>
         ) : (
-          /* 🌟 ส่วนกล้อง 🌟 */
           <div className="flex-1 flex flex-col relative bg-black">
             <div className={`${scanMethod === 'batch' ? 'h-[40%]' : 'h-full'} relative`}>
               <div id="reader" className="w-full h-full"></div>
               <button onClick={stopScanner} className="absolute top-4 right-4 bg-red-600 p-2 rounded-full shadow-xl"><X size={20}/></button>
             </div>
 
-            {/* ตะกร้าสำหรับ Batch Mode */}
             {scanMethod === 'batch' && (
               <div className="flex-1 flex flex-col bg-slate-50 rounded-t-[2.5rem] mt-[-20px] z-10 shadow-2xl overflow-hidden text-slate-900">
                  <div className="p-5 flex justify-between items-center border-b border-slate-200">
                     <span className="font-black uppercase text-xs italic"><ShoppingCart className="inline mr-2 text-blue-500" size={16}/>ในชุด ({basket.length})</span>
                     {basket.length > 0 && (
-                      <button onClick={handleSaveBatch} disabled={isSaving} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center gap-2`}>
+                      <button onClick={handleSaveBatch} disabled={isSaving} className={`${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] flex items-center gap-2 shadow-lg`}>
                         {isSaving ? <Loader2 className="animate-spin" size={14}/> : <CheckCircle2 size={14}/>} ยืนยันบันทึกทั้งหมด
                       </button>
                     )}
@@ -231,9 +210,9 @@ export default function ScanPage() {
                       <div key={item.sku_15_digits} className="bg-white p-4 rounded-[1.5rem] border border-slate-100 shadow-sm flex justify-between items-center">
                          <div className="flex-1"><p className="font-black uppercase text-xs mb-1">{item.name}</p><SKUColored sku={item.sku_15_digits} prefix={item.prefix} /></div>
                          <div className="flex items-center bg-slate-50 p-1 rounded-xl gap-2">
-                            <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, -1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-slate-400 shadow-sm"><Minus size={14}/></button>
+                            <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, -1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm text-slate-400"><Minus size={14}/></button>
                             <span className="font-black text-sm w-5 text-center">{item.amount}</span>
-                            <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, 1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center text-blue-600 shadow-sm"><Plus size={14}/></button>
+                            <button onClick={() => setBasket(prev => updateBasketQty(prev, item.sku_15_digits, 1))} className="w-7 h-7 bg-white rounded-lg flex items-center justify-center shadow-sm text-blue-600"><Plus size={14}/></button>
                          </div>
                       </div>
                    ))}
@@ -241,24 +220,57 @@ export default function ScanPage() {
               </div>
             )}
 
-            {/* Modal แบบ Single (หน้าจอ V1.0.0) */}
+            {/* 🌟 หน้าต่างกรอกจำนวนแบบเดิม (Single Mode) 🌟 */}
             {showActionModal && selectedProduct && (
               <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[300] flex items-center justify-center p-6 text-slate-900">
                  <div className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in">
-                    <div className="mb-6">
+                    <div className="mb-4 text-center">
                        <h2 className="text-xl font-black uppercase italic leading-none mb-2">{selectedProduct.name}</h2>
                        <SKUColored sku={selectedProduct.sku_15_digits} prefix={selectedProduct.prefix} />
-                       <p className="text-[10px] font-bold text-slate-400 uppercase mt-2">ขนาด: {selectedProduct.height}x{selectedProduct.width}x{selectedProduct.length}</p>
+                       <p className="text-[10px] font-bold text-slate-400 uppercase mt-2 italic">ขนาด: {selectedProduct.height}x{selectedProduct.width}x{selectedProduct.length}</p>
                     </div>
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between bg-slate-100 p-2 rounded-3xl border">
-                          <button onClick={() => setSingleAmount(prev => Math.max(1, prev - 1))} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm"><Minus size={24}/></button>
-                          <span className="text-4xl font-black">{singleAmount}</span>
-                          <button onClick={() => setSingleAmount(prev => prev + 1)} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm"><Plus size={24}/></button>
+
+                    <div className="space-y-5">
+                      {/* 🌟 ปุ่มทางลัด +5 +10 +50 🌟 */}
+                      <div className="grid grid-cols-3 gap-3">
+                        {[5, 10, 50].map(n => (
+                          <button 
+                            key={n} 
+                            onClick={() => setSingleAmount(prev => prev + n)} 
+                            className={`${scanMode === 'receive' ? 'bg-blue-50 text-blue-600 border-blue-100' : 'bg-red-50 text-red-600 border-red-100'} py-3 rounded-2xl font-black text-lg border-b-4 active:translate-y-1 transition-all shadow-sm uppercase italic`}
+                          >
+                            +{n}
+                          </button>
+                        ))}
                       </div>
-                      <textarea placeholder="หมายเหตุ..." className="w-full bg-slate-50 border rounded-2xl p-4 text-xs font-bold h-20 outline-none" value={singleNote} onChange={(e) => setSingleNote(e.target.value)}/>
-                      <button onClick={handleSaveSingle} className={`w-full py-5 rounded-2xl font-black text-lg uppercase italic text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}>บันทึกรายการ</button>
-                      <button onClick={() => { setShowActionModal(false); scannerRef.current?.resume(); }} className="w-full py-2 text-[10px] font-black text-slate-300 uppercase text-center">ยกเลิก</button>
+
+                      {/* ตัวปรับจำนวนหลัก */}
+                      <div className="flex items-center justify-between bg-slate-100 p-2 rounded-[2rem] border">
+                          <button onClick={() => setSingleAmount(prev => Math.max(1, prev - 1))} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-red-500 shadow-sm active:scale-90"><Minus size={24} strokeWidth={3}/></button>
+                          <span className="text-5xl font-black italic">{singleAmount}</span>
+                          <button onClick={() => setSingleAmount(prev => prev + 1)} className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-green-500 shadow-sm active:scale-90"><Plus size={24} strokeWidth={3}/></button>
+                      </div>
+
+                      <textarea 
+                        placeholder="หมายเหตุ (ถ้ามี)..." 
+                        className="w-full bg-slate-50 border rounded-2xl p-4 text-xs font-bold h-16 outline-none focus:border-blue-500" 
+                        value={singleNote} 
+                        onChange={(e) => setSingleNote(e.target.value)}
+                      />
+
+                      <button 
+                        onClick={handleSaveSingle} 
+                        className={`w-full py-5 rounded-3xl font-black text-xl uppercase italic text-white shadow-xl shadow-blue-500/20 active:scale-95 transition-all ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'}`}
+                      >
+                        ยืนยันบันทึก
+                      </button>
+
+                      <button 
+                        onClick={() => { setShowActionModal(false); scannerRef.current?.resume(); }} 
+                        className="w-full py-2 text-[10px] font-black text-slate-300 uppercase text-center tracking-widest"
+                      >
+                        ยกเลิกรายการ
+                      </button>
                     </div>
                  </div>
               </div>
