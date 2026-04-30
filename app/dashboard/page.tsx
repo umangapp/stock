@@ -32,7 +32,7 @@ export default function AdminDashboard() {
   const fetchData = async () => {
     setLoading(true)
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
-    const { data: p } = await supabase.from('products').select('*').order('name')
+    const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single()
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
     if (t) setTransactions(t)
