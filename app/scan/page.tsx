@@ -97,8 +97,12 @@ export default function ScanPage() {
                       <div>
                         <p className="font-black text-lg leading-none">{log.products?.name}</p>
                         {/* 🌟 ลำดับใหม่: หนา x กว้าง x ยาว */}
-                        <p className="text-[10px] font-bold text-slate-400 italic mt-1">
+                        <p className="text-[11px] font-bold text-slate-400 italic mt-1">
                           ขนาด: {log.products?.height} x {log.products?.width} x {log.products?.length} มม.
+                        </p>
+                        {/* 🌟 เพิ่ม Lot Date ใต้ขนาดสินค้า */}
+                        <p className="text-[11px] font-black text-slate-500 uppercase italic">
+                          Lot Date: {log.products?.received_date}
                         </p>
                       </div>
                       <span className={`font-black text-2xl ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
@@ -107,7 +111,7 @@ export default function ScanPage() {
                        <TrendingUp size={12} className="text-blue-500" />
                        <p className="text-[11px] font-black text-slate-600">สต๊อก: {log.old_stock || 0} {log.type === 'receive' ? '+' : '-'} {log.amount} = {log.new_stock || 0}</p>
                     </div>
-                    <p className="font-mono text-[10px] text-blue-400 font-bold">{log.products?.sku_15_digits}</p>
+                    <p className="font-mono text-[11px] text-blue-400 font-bold">{log.products?.sku_15_digits}</p>
                     <div className="flex justify-between items-center mt-1 border-t pt-2">
                        <div className="flex items-center gap-1.5"><User size={10} className="text-blue-500" /><span className="text-[9px] font-black uppercase text-slate-500">{log.created_by}</span></div>
                        <div className="flex items-center gap-1 text-[9px] font-bold text-slate-300 italic"><Clock size={10} /> {new Date(log.created_at).toLocaleTimeString('th-TH')}</div>
