@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'navigation'
+import { useRouter } from 'next/navigation' // 🌟 แก้ไขจุดนี้เรียบร้อยครับ (เติม next/)
 import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info } from 'lucide-react'
 import SingleScanner from './SingleScanner'
 import BatchScanner from './BatchScanner'
@@ -55,13 +55,11 @@ export default function ScanPage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // 🌟 ฟังก์ชันจัดการเมื่อกดค้นหาด้วยการคีย์มือ 🌟
   const handleManualSearch = () => {
     if (!scanInput.trim()) { alert("⚠️ กรุณากรอกรหัสสินค้าก่อนค้นหา"); return; }
-    setView('single'); // วิ่งเข้าโหมด Single เพื่อใช้ Modal ร่วมกัน
+    setView('single');
   }
 
-  // 🌟 ส่ง scanInput ไปเป็น initialSKU ให้ไฟล์ลูกรับไปเปิด Modal ทันที
   if (view === 'single') return <SingleScanner scanMode={scanMode} activeUser={activeUser} initialSKU={scanInput} onRefresh={fetchData} onClose={() => { setView('menu'); setScanInput(''); }} />
   if (view === 'batch') return <BatchScanner scanMode={scanMode} activeUser={activeUser} scanDelay={scanDelay} onRefresh={fetchData} onClose={() => setView('menu')} />
 
@@ -76,7 +74,6 @@ export default function ScanPage() {
       </header>
 
       <main className="flex-1 p-6 flex flex-col gap-8 justify-center max-w-sm mx-auto w-full animate-in fade-in">
-        {/* เลือกโหมดก่อนคีย์รหัสได้จากปุ่มพวกนี้ (สีจะเปลี่ยนตามสถานะโหมดปัจจุบัน) */}
         <div className="text-center mb-[-15px]">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">โหมดปัจจุบัน: </span>
           <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded ${scanMode === 'receive' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
@@ -85,21 +82,12 @@ export default function ScanPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-           <button onClick={() => { setScanMode('receive'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950 shadow-xl">
-              <ScanLine size={40} className="text-green-400"/><span className="text-[11px] font-black uppercase text-center leading-tight">นำเข้า<br/>(ทีละชิ้น)</span>
-           </button>
-           <button onClick={() => { setScanMode('receive'); setView('batch'); }} className="aspect-square bg-green-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-green-800 shadow-xl">
-              <Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white leading-tight">นำเข้า<br/>(ต่อเนื่อง)</span>
-           </button>
-           <button onClick={() => { setScanMode('issue'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950 shadow-xl">
-              <ScanLine size={40} className="text-red-400"/><span className="text-[11px] font-black uppercase text-center leading-tight">นำออก<br/>(ทีละชิ้น)</span>
-           </button>
-           <button onClick={() => { setScanMode('issue'); setView('batch'); }} className="aspect-square bg-red-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-red-800 shadow-xl">
-              <Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white leading-tight">นำออก<br/>(ต่อเนื่อง)</span>
-           </button>
+           <button onClick={() => { setScanMode('receive'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-green-400"/><span className="text-[11px] font-black uppercase text-center">นำเข้า<br/>(ทีละชิ้น)</span></button>
+           <button onClick={() => { setScanMode('receive'); setView('batch'); }} className="aspect-square bg-green-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-green-800 shadow-xl shadow-green-900/20"><Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white">นำเข้า<br/>(ต่อเนื่อง)</span></button>
+           <button onClick={() => { setScanMode('issue'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-red-400"/><span className="text-[11px] font-black uppercase text-center leading-tight">นำออก<br/>(ทีละชิ้น)</span></button>
+           <button onClick={() => { setScanMode('issue'); setView('batch'); }} className="aspect-square bg-red-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-red-800 shadow-xl shadow-red-900/20"><Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white leading-tight">นำออก<br/>(ต่อเนื่อง)</span></button>
         </div>
         
-        {/* ช่องใส่รหัสสินค้า */}
         <div className="relative">
           <input 
             type="text" 
@@ -107,9 +95,8 @@ export default function ScanPage() {
             className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase text-sm shadow-inner" 
             value={scanInput} 
             onChange={(e) => setScanInput(e.target.value)}
-            onKeyDown={(e) => { if(e.key === 'Enter') handleManualSearch(); }} // กด Enter บนคีย์บอร์ดก็ค้นหาได้
+            onKeyDown={(e) => { if(e.key === 'Enter') handleManualSearch(); }}
           />
-          {/* 🌟 ผูกคำสั่ง onClick เข้ากับแว่นขยายเรียบร้อย 🌟 */}
           <button onClick={handleManualSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2 active:scale-90 transition-all">
             <Search size={24}/>
           </button>
@@ -138,7 +125,7 @@ export default function ScanPage() {
                               <div className="flex-1">
                                   <p className="font-black text-sm uppercase leading-none mb-1.5">{log.products?.name}</p>
                                   <SKUColored sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
-                                  <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-slate-400 uppercase italic">
+                                  <div className="flex items-center gap-2 mt-2 text-[9px] font-bold text-slate-400 italic uppercase">
                                      <span>{log.products?.height}x{log.products?.width}x{log.products?.length} มม.</span>
                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-500">LOT: {log.products?.received_date}</span>
                                   </div>
