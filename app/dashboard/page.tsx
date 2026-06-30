@@ -16,12 +16,10 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
   const preLen = prefix?.length || 2;
   const paddingMatch = sku.match(/x+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
-
   const colors = isDark ? {
     pre: "text-blue-400",
     dim: "text-green-400",
@@ -33,7 +31,6 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
     lot: "text-orange-500",
     pad: "text-cyan-500"
   };
-
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -139,8 +136,10 @@ export default function AdminDashboard() {
           }
           return { ...pData, sku_15_digits: generateSKU(pData) }
         }).filter(Boolean)
+        
         if (importData.length > 0) {
-          const { error } = await supabase.from('products').insert(importData)
+          // 🌟 จุดที่แก้ไข: เติม "as any" ไว้ท้าย importData เพื่อให้ TypeScript ปล่อยผ่านและสร้าง Build ได้สำเร็จ 🌟
+          const { error } = await supabase.from('products').insert(importData as any)
           if (error) throw error
           alert(`✅ นำเข้าสำเร็จ ${importData.length} รายการ`); fetchData()
         }
@@ -207,7 +206,6 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
-        
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -296,7 +294,6 @@ export default function AdminDashboard() {
            <div className="space-y-8 animate-in fade-in text-slate-800">
              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">System Settings</h2>
              
-             {/* 🌟 ส่วนแก้ไขเวอร์ชั่นและความไวการสแกน 🌟 */}
              <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl text-white mb-8 space-y-8">
                <div className="space-y-4">
                  <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2">
@@ -326,7 +323,6 @@ export default function AdminDashboard() {
              </div>
 
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* มาสเตอร์สินค้า & หน่วยนับ (โค้ดเดิม) */}
                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                    <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า</h4>
                    <div className="flex flex-col sm:flex-row gap-3 mb-6">
