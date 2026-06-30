@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation' // 🌟 แก้ไขจุดนี้เรียบร้อยครับ (เติม next/)
+import { useRouter } from 'next/navigation' // 🌟 แก้ไขจุดนี้นำเข้าถูกต้องแล้วครับ
 import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info } from 'lucide-react'
 import SingleScanner from './SingleScanner'
 import BatchScanner from './BatchScanner'
