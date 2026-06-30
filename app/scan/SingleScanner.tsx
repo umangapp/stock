@@ -2,9 +2,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, Minus, Plus, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { X, Minus, Plus, AlertCircle } from 'lucide-react'
 
-// --- 🔊 ฟังก์ชันเสียง ---
 const playScanSound = () => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
   const oscillator = audioCtx.createOscillator();
@@ -29,7 +28,6 @@ const playErrorSound = () => {
   oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
 };
 
-// --- 🎨 แยกสี SKU ---
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const preLen = prefix?.length || 2;
@@ -46,7 +44,8 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   );
 };
 
-export default function SingleScanner({ scanMode, activeUser, onClose, onRefresh }: any) {
+// 🌟 เพิ่มการรับ prop: initialSKU เข้ามาเช็ก 🌟
+export default function SingleScanner({ scanMode, activeUser, initialSKU, onClose, onRefresh }: any) {
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [singleAmount, setSingleAmount] = useState(1)
   const [showActionModal, setShowActionModal] = useState(false)
@@ -62,18 +61,24 @@ export default function SingleScanner({ scanMode, activeUser, onClose, onRefresh
         fps: 25, qrbox: (w, h) => ({ width: Math.min(w, h) * 0.6, height: Math.min(w, h) * 0.6 }),
         aspectRatio: 1.0 
       }, handleScan, () => {})
+
+      // 🌟 ถ้าผู้ใช้งานคีย์มือส่งรหัสเข้ามา ให้ประมวลผลทันทีโดยไม่ต้องรอสแกนกล้อง 🌟
+      if (initialSKU && initialSKU.trim() !== '') {
+         handleScan(initialSKU);
+      }
     }
     start();
     return () => { scannerRef.current?.stop().catch(() => {}) }
-  }, [])
+  }, [initialSKU])
 
   const handleScan = async (sku: string) => {
-    if (isScanLocked.current) return;
+    if (isScanLocked.current && !initialSKU) return; // ล็อกเฉพาะกรณีสแกนกล้องต่อเนื่อง
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
-    if (!p) return;
+    if (!p) { alert("❌ ไม่พบข้อมูลสินค้ารหัสนี้ในระบบ"); isScanLocked.current = false; if(initialSKU) onClose(); return; }
     
     if (scanMode === 'issue' && p.current_stock <= 0) {
-        playErrorSound(); alert(`❌ สต๊อก "${p.name}" เป็น 0!`); return;
+        playErrorSound(); alert(`❌ สต๊อก "${p.name}" เป็น 0 ไม่สามารถนำออกได้!`); 
+        if(initialSKU) onClose(); return;
     }
     
     isScanLocked.current = true;
@@ -89,7 +94,7 @@ export default function SingleScanner({ scanMode, activeUser, onClose, onRefresh
     await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id);
     await supabase.from('transactions').insert([{ product_id: selectedProduct.id, type: scanMode, amount: singleAmount, old_stock: oldStock, new_stock: newStock, created_by: activeUser }]);
     onRefresh(); setShowSummaryModal(false); isScanLocked.current = false;
-    await scannerRef.current?.resume();
+    onClose(); // บันทึกเสร็จให้เด้งกลับหน้าหลักเพื่อความลื่นไหล
   }
 
   return (
@@ -103,10 +108,9 @@ export default function SingleScanner({ scanMode, activeUser, onClose, onRefresh
       </div>
       
       <div className="flex-1 bg-[#0a0f18] flex items-center justify-center p-6 text-center">
-         <p className="text-slate-500 font-black uppercase italic animate-pulse tracking-widest text-sm">เล็ง QR ในกรอบสี่เหลี่ยม<br/>เพื่อสแกนทีละชิ้น</p>
+         <p className="text-slate-500 font-black uppercase italic animate-pulse tracking-widest text-sm">ค้นหาข้อมูลสำเร็จเรียบร้อย...</p>
       </div>
 
-      {/* --- 🌟 1. หน้าจอตรวจสอบรายการ (Action Modal) 🌟 --- */}
       {showActionModal && (
           <div className="fixed inset-0 bg-black/90 z-[300] flex items-center justify-center p-6 text-slate-900">
              <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-center animate-in zoom-in duration-300">
@@ -133,12 +137,11 @@ export default function SingleScanner({ scanMode, activeUser, onClose, onRefresh
                     if(scanMode === 'issue' && singleAmount > selectedProduct.current_stock) { playErrorSound(); alert(`❌ สต๊อกไม่พอจ่าย! (คงเหลือ: ${selectedProduct.current_stock})`); return; }
                     setShowActionModal(false); setShowSummaryModal(true); 
                 }} className={`w-full py-6 rounded-[2rem] font-black text-xl text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} active:scale-95 transition-all`}>ตรวจสอบรายการ</button>
-                <button onClick={() => { setShowActionModal(false); isScanLocked.current = false; scannerRef.current?.resume(); }} className="mt-6 text-slate-300 font-black uppercase text-xs tracking-widest">ยกเลิก</button>
+                <button onClick={() => { setShowActionModal(false); isScanLocked.current = false; onClose(); }} className="mt-6 text-slate-300 font-black uppercase text-xs tracking-widest">ยกเลิก</button>
              </div>
           </div>
       )}
 
-      {/* --- 🌟 2. หน้าจอสรุปรายการ (Summary Modal) 🌟 --- */}
       {showSummaryModal && (
           <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-xl z-[400] flex items-center justify-center p-4 text-slate-900">
              <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-center animate-in zoom-in duration-300">
