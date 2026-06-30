@@ -47,7 +47,7 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
 export default function AdminDashboard() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState('inventory') // 🌟 ย้ายมาเป็นหน้าเริ่มต้นลำดับที่ 1
+  const [activeTab, setActiveTab] = useState('inventory')
   const [transactions, setTransactions] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [masterProducts, setMasterProducts] = useState<any[]>([])
@@ -113,6 +113,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
+  // 🌟 ฟังก์ชัน Import แบบใหม่ หั่นขนาดอัตโนมัติ 🌟
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -125,22 +126,29 @@ export default function AdminDashboard() {
         const worksheet = workbook.Sheets[sheetName]
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
         const rows = jsonData.slice(1)
+        
         const importData = rows.map(row => {
           if (!row[0]) return null
+          
+          // หั่นข้อความในคอลัมน์ขนาด (Column C) ด้วยอักษร x หรือ X
+          const sizeStr = String(row[2] || '').toLowerCase().trim();
+          const sizeParts = sizeStr.split('x');
+          
           const pData = {
             name: String(row[0]).trim(),
             prefix: String(row[1] || 'XXX').trim().toUpperCase(),
-            height: String(row[2] || '').trim(),
-            width: String(row[3] || '').trim(),
-            length: String(row[4] || '').trim(),
-            received_date: String(row[5] || '').trim(),
-            unit: String(row[6] || '').trim(),
-            current_stock: Number(row[7] || 0)
+            // ส่วนประมวลผลการหั่นขนาดแบบเดาใจ
+            height: sizeParts[0] ? sizeParts[0].trim() : '',
+            width: sizeParts[1] ? sizeParts[1].trim() : '',
+            length: sizeParts[2] ? sizeParts[2].trim() : '', // ถ้ามี 2 ชุด ส่วนนี้จะกลายเป็นค่าว่าง '' โดยอัตโนมัติ
+            received_date: String(row[3] || '').trim(), // ขยับลำดับคอลัมน์ที่เหลือขึ้นมาแทนที่
+            unit: String(row[4] || '').trim(),
+            current_stock: Number(row[5] || 0)
           }
           return { ...pData, sku_15_digits: generateSKU(pData) }
         }).filter(Boolean)
+        
         if (importData.length > 0) {
-          // 🌟 เติม "as any" เพื่อแก้ปัญหา Type Error ตอน compile บนเว็บบอร์ด Vercel 🌟
           const { error } = await supabase.from('products').insert(importData as any)
           if (error) throw error
           alert(`✅ นำเข้าสำเร็จ ${importData.length} รายการ`); fetchData()
@@ -198,7 +206,6 @@ export default function AdminDashboard() {
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
         </div>
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
-          {/* 🌟 ย้ายสต๊อกสินค้าขึ้นมาไว้เป็นอันดับที่ 1 เรียบร้อย 🌟 */}
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
             { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
@@ -240,7 +247,6 @@ export default function AdminDashboard() {
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
                           
-                          {/* 🌟 คืนชีพวันเวลาอัปเดตและสถานะแบบกึ่งท้ายการ์ด ไม่กระทบดีไซน์หลัก 🌟 */}
                           <div className="pt-2.5 border-t border-dashed border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 italic">
                             <span className="flex items-center gap-1">
                               <Clock size={12}/> 
