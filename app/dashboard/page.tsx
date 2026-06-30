@@ -113,7 +113,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชัน Import แบบใหม่ หั่นขนาดอัตโนมัติ 🌟
+  // 🌟 ฟังก์ชัน Import แก้ไขระบบรองรับทศนิยม . ตัวเลข 🌟
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -130,22 +130,39 @@ export default function AdminDashboard() {
         const importData = rows.map(row => {
           if (!row[0]) return null
           
-          // หั่นข้อความในคอลัมน์ขนาด (Column C) ด้วยอักษร x หรือ X
           const sizeStr = String(row[2] || '').toLowerCase().trim();
           const sizeParts = sizeStr.split('x');
           
-          const pData = {
+          const hVal = sizeParts[0] ? sizeParts[0].trim() : '';
+          const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
+          const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
+
+          // 1. แพ็คข้อมูลเป็น String ก่อนเพื่อให้ generateSKU ทำงานได้ถูกต้องแม่นยำตามสูตรเดิม
+          const pDataForSKU = {
             name: String(row[0]).trim(),
             prefix: String(row[1] || 'XXX').trim().toUpperCase(),
-            // ส่วนประมวลผลการหั่นขนาดแบบเดาใจ
-            height: sizeParts[0] ? sizeParts[0].trim() : '',
-            width: sizeParts[1] ? sizeParts[1].trim() : '',
-            length: sizeParts[2] ? sizeParts[2].trim() : '', // ถ้ามี 2 ชุด ส่วนนี้จะกลายเป็นค่าว่าง '' โดยอัตโนมัติ
-            received_date: String(row[3] || '').trim(), // ขยับลำดับคอลัมน์ที่เหลือขึ้นมาแทนที่
+            height: hVal,
+            width: wVal,
+            length: lVal,
+            received_date: String(row[3] || '').trim(),
             unit: String(row[4] || '').trim(),
             current_stock: Number(row[5] || 0)
           }
-          return { ...pData, sku_15_digits: generateSKU(pData) }
+          
+          const sku = generateSKU(pDataForSKU)
+
+          // 2. ส่งข้อมูลกลับโดยแปลงมิติขนาดเป็นตัวเลขทศนิยม (Float) จริงๆ ป้องกันการเด้งหลุดของฐานข้อมูล
+          return {
+            name: pDataForSKU.name,
+            prefix: pDataForSKU.prefix,
+            height: hVal ? parseFloat(hVal) : 0,
+            width: wVal ? parseFloat(wVal) : 0,
+            length: lVal ? parseFloat(lVal) : 0,
+            received_date: pDataForSKU.received_date,
+            unit: pDataForSKU.unit,
+            current_stock: pDataForSKU.current_stock,
+            sku_15_digits: sku
+          }
         }).filter(Boolean)
         
         if (importData.length > 0) {
