@@ -16,10 +16,12 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
   const preLen = prefix?.length || 2;
   const paddingMatch = sku.match(/x+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+
   const colors = isDark ? {
     pre: "text-blue-400",
     dim: "text-green-400",
@@ -31,6 +33,7 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
     lot: "text-orange-500",
     pad: "text-cyan-500"
   };
+
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -44,7 +47,7 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
 export default function AdminDashboard() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('inventory') // 🌟 ย้ายมาเป็นหน้าเริ่มต้นลำดับที่ 1
   const [transactions, setTransactions] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [masterProducts, setMasterProducts] = useState<any[]>([])
@@ -136,9 +139,8 @@ export default function AdminDashboard() {
           }
           return { ...pData, sku_15_digits: generateSKU(pData) }
         }).filter(Boolean)
-        
         if (importData.length > 0) {
-          // 🌟 จุดที่แก้ไข: เติม "as any" ไว้ท้าย importData เพื่อให้ TypeScript ปล่อยผ่านและสร้าง Build ได้สำเร็จ 🌟
+          // 🌟 เติม "as any" เพื่อแก้ปัญหา Type Error ตอน compile บนเว็บบอร์ด Vercel 🌟
           const { error } = await supabase.from('products').insert(importData as any)
           if (error) throw error
           alert(`✅ นำเข้าสำเร็จ ${importData.length} รายการ`); fetchData()
@@ -196,7 +198,12 @@ export default function AdminDashboard() {
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
         </div>
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
-          {[{ id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard }, { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package }, { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }].map((item) => (
+          {/* 🌟 ย้ายสต๊อกสินค้าขึ้นมาไว้เป็นอันดับที่ 1 เรียบร้อย 🌟 */}
+          {[
+            { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
+            { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
+            { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
+          ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
               <item.icon size={20} /> {item.label}
             </button>
@@ -206,6 +213,7 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
+        
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -231,6 +239,17 @@ export default function AdminDashboard() {
                             <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
+                          
+                          {/* 🌟 คืนชีพวันเวลาอัปเดตและสถานะแบบกึ่งท้ายการ์ด ไม่กระทบดีไซน์หลัก 🌟 */}
+                          <div className="pt-2.5 border-t border-dashed border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 italic">
+                            <span className="flex items-center gap-1">
+                              <Clock size={12}/> 
+                              {new Date(log.created_at).toLocaleDateString('th-TH')} {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
+                            </span>
+                            <span className={log.type === 'receive' ? 'text-green-600' : 'text-red-600'}>
+                              {log.type === 'receive' ? 'INCOMING' : 'OUTGOING'}
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
