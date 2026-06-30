@@ -113,7 +113,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชัน Import แก้ไขระบบรองรับทศนิยม . ตัวเลข 🌟
+  // 🌟 ฟังก์ชัน Import ปรับใช้ระบบ UPSERT ป้องกันรหัส SKU ซ้ำชนกันชน 🌟
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -137,7 +137,6 @@ export default function AdminDashboard() {
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
 
-          // 1. แพ็คข้อมูลเป็น String ก่อนเพื่อให้ generateSKU ทำงานได้ถูกต้องแม่นยำตามสูตรเดิม
           const pDataForSKU = {
             name: String(row[0]).trim(),
             prefix: String(row[1] || 'XXX').trim().toUpperCase(),
@@ -151,7 +150,6 @@ export default function AdminDashboard() {
           
           const sku = generateSKU(pDataForSKU)
 
-          // 2. ส่งข้อมูลกลับโดยแปลงมิติขนาดเป็นตัวเลขทศนิยม (Float) จริงๆ ป้องกันการเด้งหลุดของฐานข้อมูล
           return {
             name: pDataForSKU.name,
             prefix: pDataForSKU.prefix,
@@ -166,9 +164,10 @@ export default function AdminDashboard() {
         }).filter(Boolean)
         
         if (importData.length > 0) {
-          const { error } = await supabase.from('products').insert(importData as any)
+          // 🌟 เปลี่ยนจาก .insert() เป็น .upsert() เพื่อแก้ปัญหาคีย์ซ้ำชนกันเด๊ะ 🌟
+          const { error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' })
           if (error) throw error
-          alert(`✅ นำเข้าสำเร็จ ${importData.length} รายการ`); fetchData()
+          alert(`✅ ประมวลผลและนำเข้าสต๊อกสินค้าสำเร็จ ${importData.length} รายการ`); fetchData()
         }
       } catch (err: any) { alert("❌ การนำเข้าผิดพลาด: " + err.message) }
     }
@@ -193,10 +192,15 @@ export default function AdminDashboard() {
     if (!error) { setIsEditModalOpen(false); fetchData(); }
   }
 
+  // 🌟 ปรับปรุงปุ่มลบสินค้า ให้แสดงแจ้งเตือนฟ้องบอกเหตุผลหากติดเงื่อนไขประวัติการใช้งาน 🌟
   const deleteProduct = async (id: string) => {
     if (!confirm("⚠️ ยืนยันการลบ?")) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (!error) fetchData();
+    if (error) {
+      alert(`❌ ไม่สามารถลบได้เนื่องจาก: สินค้านี้มีประวัติการสแกน (Transactions) ผูกอยู่ในระบบครับ`);
+    } else {
+      fetchData();
+    }
   }
 
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
