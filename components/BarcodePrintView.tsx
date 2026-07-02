@@ -24,12 +24,12 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   
-  // 🌟 แผงควบคุมส่วนกลางตามสั่งของพี่ตั้ม
+  // แผงควบคุมส่วนกลางตามสั่งของพี่ตั้ม
   const [companyName, setCompanyName] = useState('บริษัท อุมัง จำกัด')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [showAmountRow, setShowAmountRow] = useState(false) // 🔒 Default = ไม่แสดง (false)
+  const [showAmountRow, setShowAmountRow] = useState(false) // Default = ไม่แสดง (false)
 
-  // 🌟 เก็บสถานะตัวเลือกสินค้าแต่ละแถว (ติ๊กเลือก, จำนวนใบสติ๊กเกอร์, รหัส Pack, และจำนวนชิ้นบนป้าย)
+  // เก็บสถานะตัวเลือกสินค้าแต่ละแถว (ติ๊กเลือก, จำนวนใบสติ๊กเกอร์, รหัส Pack, และจำนวนชิ้นบนป้าย)
   const [itemSettings, setItemSettings] = useState<{[key: string]: { checked: boolean, copies: number, packNo: string, labelAmount: number }}>({})
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,7 +40,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   }
 
   const updateItemSetting = (id: string, key: string, value: any) => {
-    const current = itemSettings[id] || { checked: false, copies: 1, packNo: '', labelAmount: 1 } // 🔒 Default จำนวนชิ้นบนป้าย = 1
+    const current = itemSettings[id] || { checked: false, copies: 1, packNo: '', labelAmount: 1 } // Default จำนวนชิ้นบนป้าย = 1
     setItemSettings({
       ...itemSettings,
       [id]: { ...current, [key]: value }
@@ -71,7 +71,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   return (
     <div className="space-y-8 animate-in fade-in">
       
-      {/* 🌟 แผงควบคุมตั้งค่าส่วนกลาง (หัวบริษัท, โลโก้, และสวิตช์เปิดปิดจำนวน) */}
+      {/* แผงควบคุมตั้งค่าส่วนกลาง (หัวบริษัท, โลโก้, และสวิตช์เปิดปิดจำนวน) */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 no-print text-slate-800">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -110,7 +110,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
             </div>
           </div>
           
-          {/* 🔒 ตัวเลือก Checkbox ยืดหยุ่นตามเงื่อนไขของพี่ตั้ม */}
+          {/* ตัวเลือก Checkbox ยืดหยุ่นตามเงื่อนไขของพี่ตั้ม */}
           <div className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60 h-[58px]">
             <input 
               type="checkbox" 
@@ -126,7 +126,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       </div>
 
-      {/* 🌟 ตารางเลือกของและกำหนดจำนวนใบพิมพ์ */}
+      {/* ตารางเลือกของและกำหนดจำนวนใบพิมพ์ */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 no-print text-slate-800">
         <div className="xl:col-span-2 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col max-h-[700px]">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -158,7 +158,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                       <input type="text" className="w-20 bg-white border p-2 rounded-xl text-xs font-bold text-center" placeholder="P-01" value={state.packNo} onChange={e => updateItemSetting(item.id, 'packNo', e.target.value)} />
                     </div>
                     
-                    {/* 🔒 แสดงช่องป้อนจำนวนชิ้นสติกเกอร์เฉพาะเมื่อเปิดติ๊กถูกข้างบน ดึงหน่วยท้ายช่องอัตโนมัติ */}
+                    {/* แสดงช่องป้อนจำนวนชิ้นสติกเกอร์เฉพาะเมื่อเปิดติ๊กถูกข้างบน ดึงหน่วยท้ายช่องอัตโนมัติ */}
                     {showAmountRow && (
                       <div>
                         <span className="text-[9px] text-blue-500 block font-black uppercase mb-1">จำนวน ({item.unit})</span>
@@ -188,10 +188,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                   <p><span className="text-slate-400 font-black uppercase">Pack No. :</span> {printCards[0].packNo}</p>
                   <p className="truncate"><span className="text-slate-400 font-black uppercase">ตัวย่อ :</span> {printCards[0].prefix}: {printCards[0].name}</p>
                   <p><span className="text-slate-400 font-black uppercase">ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
-                  
-                  {/* 🔒 ดักจับซ่อน/แสดงบรรทัดจำนวนแบบเรียบเนียนออโต้ */}
                   {showAmountRow && <p><span className="text-slate-400 font-black uppercase">จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
-                  
                   <p><span className="text-slate-400 font-black uppercase">Lot Date :</span> {printCards[0].received_date}</p>
                 </div>
                 <div className="mt-4 flex flex-col items-center gap-1 bg-slate-50 p-3 rounded-xl border border-slate-200">
@@ -204,7 +201,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       </div>
 
-      {/* 🌟 หน้าจอพรีวิวแบบตารางรวม 3x4 บนหน้าเว็บแอปหลัก (no-print) */}
+      {/* หน้าจอพรีวิวแบบตารางรวม 3x4 บนหน้าเว็บแอปหลัก (no-print) */}
       {printCards.length > 0 && (
         <div className="no-print bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-sm">
           <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ โครงสร้างจำลองก่อนส่งพิมพ์ลงแผ่น A4 (หน้าละ 12 ดวง)</h4>
@@ -233,7 +230,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       )}
 
-      {/* 🔒 🖨️ โครงสร้าง HTML แท้ๆ สำหรับยิงเข้าเครื่องพิมพ์ (แสดงผลเฉพาะตอนสั่งพิมพ์/เซฟ PDF เท่านั้น) */}
+      {/* โครงสร้าง HTML แท้ๆ สำหรับยิงเข้าเครื่องพิมพ์ (แสดงผลเฉพาะตอนสั่งพิมพ์/เซฟ PDF เท่านั้น) */}
       <div className="print-area hidden">
         {Array.from({ length: Math.ceil(printCards.length / 12) }).map((_, pageIdx) => (
           <div key={pageIdx} className="sticker-page">
@@ -244,12 +241,13 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                   <p><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                   <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix}: {card.name}</p>
                   <p><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
-                  {showAmountRow && <p><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
+                  {showAmountRow && <p style={{ color: '#000000' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
                   <p><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
                 </div>
                 <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f8fafc', padding: '5px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
                   <QRCodeCanvas value={card.sku_15_digits} size={90} level="H" imageSettings={logoUrl ? { src: logoUrl, height: 18, width: 18, excavate: true } : undefined} />
-                  <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: '10px', tracking: '0.1em', marginTop: '3px', color: '#000000' }}>{card.sku_15_digits}</span>
+                  {/* 🔒 เปลี่ยนจาก tracking: '0.1em' เป็น letterSpacing: '0.1em' แก้ไขจุดเอ๋อประเภทข้อมูล TypeScript */}
+                  <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: '10px', letterSpacing: '0.1em', marginTop: '3px', color: '#000000' }}>{card.sku_15_digits}</span>
                 </div>
               </div>
             ))}
