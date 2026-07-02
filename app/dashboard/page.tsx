@@ -4,16 +4,16 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { APP_VERSION_FALLBACK } from '@/lib/version'
 import * as XLSX from 'xlsx'
+// 🌟 อิมพอร์ตโมดูลสติกเกอร์บาร์โค้ดแยกไฟล์ที่เราเพิ่งสร้างขึ้นมา
+import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
-  ChevronDown, ChevronUp, Clock, TrendingUp, Edit3, Plus, Trash2, X, FileSpreadsheet, AlertCircle, Info, Zap 
+  ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode 
 } from 'lucide-react'
 
-// 🌟 ฟังก์ชันแปลงฟอร์แมตวันที่จาก DD/MM/YYYY ให้เป็น YYMMDD
 const parseExcelDate = (dateVal: any): string => {
   if (!dateVal) return '';
   let dateStr = String(dateVal).trim();
-  
   if (dateStr.includes('/')) {
     const parts = dateStr.split('/');
     if (parts.length === 3) {
@@ -24,7 +24,6 @@ const parseExcelDate = (dateVal: any): string => {
       return `${year}${month}${day}`;
     }
   }
-  
   if (dateStr.includes('-')) {
     const parts = dateStr.split('-');
     if (parts.length === 3) {
@@ -35,7 +34,6 @@ const parseExcelDate = (dateVal: any): string => {
       return `${year}${month}${day}`;
     }
   }
-
   if (/^\d+$/.test(dateStr) && dateStr.length === 5) {
     const serial = Number(dateStr);
     const utc_days  = Math.floor(serial - 25569);
@@ -46,28 +44,19 @@ const parseExcelDate = (dateVal: any): string => {
     const day = String(date_info.getDate()).padStart(2, '0');
     return `${year}${month}${day}`;
   }
-
   return dateStr;
 };
 
-// 🌟 ฟังก์ชันแยกสี SKU สำหรับ Admin
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
   const preLen = prefix?.length || 2;
   const paddingMatch = sku.match(/x+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
-
-  const colors = isDark ? {
-    pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-cyan-300"
-  } : {
-    pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-cyan-500"
-  };
-
+  const colors = isDark ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-cyan-300" } : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-cyan-500" };
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -89,66 +78,43 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
-  // App Config States
   const [appVersion, setAppVersion] = useState(APP_VERSION_FALLBACK)
   const [newVersionInput, setNewVersionInput] = useState('')
   const [scanDelay, setScanDelay] = useState(1000)
-
   const [expandedUsers, setExpandedUsers] = useState<string[]>([])
   const [expandedGroups, setExpandedGroups] = useState<string[]>([])
-  
   const [inputName, setInputName] = useState('')
   const [inputPrefix, setInputPrefix] = useState('')
   const [inputUnit, setInputUnit] = useState('')
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  
-  // 🌟 เพิ่มฟิลด์ sku_15_digits รองรับการกรอกรหัสแมนนวลมือ
-  const [newProduct, setNewProduct] = useState({ 
-    name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, sku_15_digits: '' 
-  })
+  const [newProduct, setNewProduct] = useState({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, sku_15_digits: '' })
 
   const fetchData = async () => {
     setLoading(true)
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
-    const { data: p } = await supabase.from('products').select('*')
-      .order('height', { ascending: true })
-      .order('width', { ascending: true })
-      .order('length', { ascending: true })
+    const { data: p } = await supabase.from('products').select('*').order('height', { ascending: true }).order('width', { ascending: true }).order('length', { ascending: true })
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
-    
-    const { data: ver } = await supabase.from('settings_app_config').select('*').single()
-    
+    const { data: ver = null } = await supabase.from('settings_app_config').select('*').maybeSingle()
     if (t) setTransactions(t)
     if (p) setProducts(p)
     if (mp) setMasterProducts(mp)
     if (mu) setMasterUnits(mu)
-    if (ver) { 
-        setAppVersion(ver.version); 
-        setNewVersionInput(ver.version);
-        setScanDelay(ver.scan_delay || 1000);
-    }
+    if (ver) { setAppVersion(ver.version); setNewVersionInput(ver.version); setScanDelay(ver.scan_delay || 1000); }
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
 
   const updateSettings = async () => {
-    const { error } = await supabase.from('settings_app_config')
-      .update({ version: newVersionInput, scan_delay: scanDelay })
-      .eq('id', 1)
-    if (!error) {
-      setAppVersion(newVersionInput);
-      alert("✅ บันทึกการตั้งค่าระบบเรียบร้อย");
-    }
+    const { error } = await supabase.from('settings_app_config').update({ version: newVersionInput, scan_delay: scanDelay }).eq('id', 1)
+    if (!error) { setAppVersion(newVersionInput); alert("✅ บันทึกการตั้งค่าระบบเรียบร้อย"); }
   }
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชัน Import ไฟล์ Excel ดึงรหัส SKU ระบุเองจากคอลัมน์ G (คอลัมน์ที่ 7) 🌟
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -161,46 +127,25 @@ export default function AdminDashboard() {
         const worksheet = workbook.Sheets[sheetName]
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
         const rows = jsonData.slice(1)
-        
         let hasValidationError = false;
-        
         const importData = rows.map((row, index) => {
           if (!row[0]) return null
           if (hasValidationError) return null;
-          
           const sizeStr = String(row[2] || '').toLowerCase().trim();
           const sizeParts = sizeStr.split('x');
-          
           const hVal = sizeParts[0] ? sizeParts[0].trim() : '';
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
-
           const formattedDate = parseExcelDate(row[3]);
-          
-          // 🔒 ดึงรหัส SKU จากช่องที่ 7 (Column G -> Index 6) และทำการตรวจเช็กกฎเหล็ก 15 หลัก
           const manualSku = String(row[6] || '').trim().toUpperCase();
-
           if (manualSku.length !== 15) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU ยาว ${manualSku.length} หลัก ซึ่งไม่ตรงกับสเปกควบคุม (ต้องครบ 15 หลักพอดีเป๊ะ) ระบบยกเลิกการ Import ทันที กรุณาตรวจสอบไฟล์ Excel`);
             hasValidationError = true;
             return null;
           }
-
-          return {
-            name: String(row[0]).trim(),
-            prefix: String(row[1] || 'XXX').trim().toUpperCase(),
-            height: hVal ? parseFloat(hVal) : 0,
-            width: wVal ? parseFloat(wVal) : 0,
-            length: lVal ? parseFloat(lVal) : 0,
-            received_date: formattedDate,
-            unit: String(row[4] || '').trim(),
-            current_stock: Number(row[5] || 0),
-            sku_15_digits: manualSku // 🚀 ดึงไปบันทึกตรงๆ ไม่ประมวลผลหั่นแข่งกับยูสเซอร์
-          }
+          return { name: String(row[0]).trim(), prefix: String(row[1] || 'XXX').trim().toUpperCase(), height: hVal ? parseFloat(hVal) : 0, width: wVal ? parseFloat(wVal) : 0, length: lVal ? parseFloat(lVal) : 0, received_date: formattedDate, unit: String(row[4] || '').trim(), current_stock: Number(row[5] || 0), sku_15_digits: manualSku }
         }).filter(Boolean)
-        
         if (hasValidationError) return;
-
         if (importData.length > 0) {
           const { error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' })
           if (error) throw error
@@ -219,10 +164,7 @@ export default function AdminDashboard() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (newProduct.sku_15_digits.length !== 15) {
-      alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องมีความยาวครบ 15 หลักพอดีเป๊ะครับ");
-      return;
-    }
+    if (newProduct.sku_15_digits.length !== 15) { alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องมีความยาวครบ 15 หลักพอดีเป๊ะครับ"); return; }
     const { error } = await supabase.from('products').insert([{ ...newProduct, current_stock: Number(newProduct.current_stock) }])
     if (!error) { setIsAddModalOpen(false); fetchData(); }
     else { alert("❌ เกิดข้อผิดพลาด: รหัส SKU นี้อาจซ้ำกับสินค้าอื่นในระบบ"); }
@@ -230,10 +172,7 @@ export default function AdminDashboard() {
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editingProduct.sku_15_digits.length !== 15) {
-      alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องมีความยาวครบ 15 หลักพอดีเป๊ะครับ");
-      return;
-    }
+    if (editingProduct.sku_15_digits.length !== 15) { alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องมีความยาวครบ 15 หลักพอดีเป๊ะครับ"); return; }
     const { error } = await supabase.from('products').update({ ...editingProduct, current_stock: Number(editingProduct.current_stock) }).eq('id', editingProduct.id)
     if (!error) { setIsEditModalOpen(false); fetchData(); }
   }
@@ -241,11 +180,8 @@ export default function AdminDashboard() {
   const deleteProduct = async (id: string) => {
     if (!confirm("⚠️ ยืนยันการลบ?")) return;
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) {
-      alert(`❌ ไม่สามารถลบได้เนื่องจาก: สินค้านี้มีประวัติการสแกน (Transactions) ผูกอยู่ในระบบครับ`);
-    } else {
-      fetchData();
-    }
+    if (error) alert(`❌ ไม่สามารถลบได้เนื่องจาก: สินค้านี้มีประวัติการสแกนผูกอยู่ในระบบครับ`);
+    else fetchData();
   }
 
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
@@ -264,9 +200,39 @@ export default function AdminDashboard() {
 
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
+      
+      {/* 🌟 สไตล์ชีทคุมระบบตัดหน้ากระดาษ A4 สำหรับพิมพ์สติ๊กเกอร์ชุด (ล็อกสัดส่วนดวงให้พอดีเป๊ะ) */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          main { padding: 0 !important; overflow: visible !important; }
+          .print-area { display: block !important; width: 210mm; background: white; }
+          .sticker-page { 
+            display: grid !important; 
+            grid-template-columns: repeat(3, 1fr) !important; 
+            grid-template-rows: repeat(4, 1fr) !important;
+            gap: 5mm !important;
+            padding: 6mm 5mm !important;
+            height: 297mm !important; 
+            page-break-after: always !important;
+            box-sizing: border-box !important;
+          }
+          .sticker-card { 
+            border: 1px solid #94a3b8 !important;
+            padding: 4mm !important;
+            border-radius: 6px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
+
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
       
-      <nav className="w-full lg:w-72 bg-slate-900 text-white p-6 flex lg:flex-col gap-2 shrink-0 z-20 shadow-2xl">
+      <nav className="w-full lg:w-72 bg-slate-900 text-white p-6 flex lg:flex-col gap-2 shrink-0 z-20 shadow-2xl no-print">
         <div className="mb-10">
             <h1 className="text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
@@ -274,6 +240,7 @@ export default function AdminDashboard() {
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
+            { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
             { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
             { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
           ].map((item) => (
@@ -287,8 +254,64 @@ export default function AdminDashboard() {
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         
+        {/* TAB: สต๊อกสินค้า */}
+        {activeTab === 'inventory' && (
+          <div className="space-y-8 animate-in fade-in no-print">
+            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
+               <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สต๊อกสินค้า</h2>
+               <div className="flex gap-3 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-64"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/><input type="text" placeholder="ค้นหา..." className="w-full bg-white border p-4 pl-12 rounded-2xl outline-none shadow-sm focus:border-blue-500 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
+                  <button onClick={handleImportClick} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"><FileSpreadsheet size={16}/> Import</button>
+                  <button onClick={() => { setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, sku_15_digits: '' }); setIsAddModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
+               </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
+                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit">
+                  <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center text-slate-800">
+                    <div className="flex-1 pr-4">
+                      <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-4xl font-black text-slate-900 leading-none">{group.totalStock}</p>
+                      <p className="text-[10px] font-black uppercase text-slate-400 mt-1">{group.unit}</p>
+                    </div>
+                  </div>
+                  {expandedGroups.includes(group.name) && (
+                    <div className="p-4 bg-slate-50 space-y-3">
+                      {group.items.map((item: any) => (
+                        <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm text-slate-800">
+                          <div className="flex-1">
+                            <div className="mb-1 leading-none"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none italic">{item.height} x {item.width} x {item.length}</p>
+                                <span className="text-[9px] font-black text-slate-500 uppercase italic bg-slate-50 px-2 py-0.5 rounded border border-slate-100">Lot: {item.received_date}</span>
+                            </div>
+                            <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0 ml-4">
+                             <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
+                             <button onClick={() => deleteProduct(item.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 🌟 TAB: สร้างบาร์โค้ด (เรียกใช้ Component ตัวใหม่ที่เราเพิ่งแยกไฟล์ออกมา) 🌟 */}
+        {activeTab === 'barcode' && (
+          <BarcodePrintView products={products} />
+        )}
+
+        {/* TAB: ภาพรวมระบบ */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-8 animate-in fade-in">
+          <div className="space-y-8 animate-in fade-in no-print">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {Object.entries(groupedByUser).map(([user, logs]: [string, any]) => (
@@ -312,16 +335,6 @@ export default function AdminDashboard() {
                             <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
-                          
-                          <div className="pt-2.5 border-t border-dashed border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400 italic">
-                            <span className="flex items-center gap-1">
-                              <Clock size={12}/> 
-                              {new Date(log.created_at).toLocaleDateString('th-TH')} {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.
-                            </span>
-                            <span className={log.type === 'receive' ? 'text-green-600' : 'text-red-600'}>
-                              {log.type === 'receive' ? 'INCOMING' : 'OUTGOING'}
-                            </span>
-                          </div>
                         </div>
                       ))}
                     </div>
@@ -332,167 +345,55 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {activeTab === 'inventory' && (
-          <div className="space-y-8 animate-in fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-               <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สต๊อกสินค้า</h2>
-               <div className="flex gap-3 w-full md:w-auto">
-                  <div className="relative flex-1 md:w-64"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/><input type="text" placeholder="ค้นหา..." className="w-full bg-white border p-4 pl-12 rounded-2xl outline-none shadow-sm focus:border-blue-500 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} /></div>
-                  <button onClick={handleImportClick} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"><FileSpreadsheet size={16}/> Import</button>
-                  <button onClick={() => { setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, sku_15_digits: '' }); setIsAddModalOpen(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
-               </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
-                <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit transition-all hover:border-blue-400 text-slate-800">
-                  <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
-                    <div className="flex-1 pr-4">
-                      <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-4xl font-black text-slate-900 leading-none">{group.totalStock}</p>
-                      <p className="text-[10px] font-black uppercase text-slate-400 mt-1">{group.unit}</p>
-                    </div>
-                  </div>
-                  {expandedGroups.includes(group.name) && (
-                    <div className="p-4 bg-slate-50 space-y-3">
-                      {group.items.map((item: any) => (
-                        <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm">
-                          <div className="flex-1">
-                            <div className="mb-1 leading-none"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
-                            <div className="flex items-center gap-2 mb-2">
-                                <p className="text-[10px] font-bold text-slate-400 uppercase leading-none italic">{item.height} x {item.width} x {item.length}</p>
-                                <span className="text-[9px] font-black text-slate-500 uppercase italic bg-slate-50 px-2 py-0.5 rounded border border-slate-100">Lot: {item.received_date}</span>
-                            </div>
-                            <p className="font-black text-2xl text-slate-900 leading-none">{item.current_stock} <span className="text-xs opacity-30 uppercase tracking-widest ml-1">{item.unit}</span></p>
-                          </div>
-                          <div className="flex flex-col gap-2 shrink-0 ml-4">
-                             <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-3 bg-blue-50 text-blue-600 rounded-2xl hover:bg-blue-600 hover:text-white transition-all shadow-sm"><Edit3 size={18}/></button>
-                             <button onClick={() => deleteProduct(item.id)} className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all shadow-sm"><Trash2 size={18}/></button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
+        {/* TAB: ตั้งค่าระบบ */}
         {activeTab === 'settings' && (
-           <div className="space-y-8 animate-in fade-in text-slate-800">
+           <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">System Settings</h2>
-             
              <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl text-white mb-8 space-y-8">
                <div className="space-y-4">
-                 <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2">
-                   <Info size={18}/> App Version
-                 </h4>
-                 <div className="flex flex-col sm:flex-row gap-4">
-                   <input type="text" className="flex-1 bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-blue-500 font-black text-xl" value={newVersionInput} onChange={e => setNewVersionInput(e.target.value)} />
-                 </div>
+                 <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2"><Info size={18}/> App Version</h4>
+                 <input type="text" className="w-full sm:w-64 bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-blue-500 font-black text-xl" value={newVersionInput} onChange={e => setNewVersionInput(e.target.value)} />
                </div>
-
                <div className="space-y-4 border-t border-white/5 pt-8">
-                 <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2">
-                   <Zap size={18}/> ความไวการสแกน (Turbo Delay)
-                 </h4>
-                 <div className="flex flex-col sm:flex-row gap-8 items-center">
-                   <div className="flex-1 w-full">
-                     <input type="range" min="500" max="3000" step="100" className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer" value={scanDelay} onChange={e => setScanDelay(Number(e.target.value))} />
-                     <div className="flex justify-between text-[10px] font-black text-slate-500 mt-2 uppercase tracking-widest">
-                       <span>เร็ว (0.5s)</span>
-                       <span className="text-blue-400 text-lg">{scanDelay/1000} วินาที</span>
-                       <span>ช้า (3.0s)</span>
-                     </div>
-                   </div>
-                   <button onClick={updateSettings} className="w-full sm:w-auto bg-blue-600 text-white px-12 py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-all">บันทึกตั้งค่า</button>
-                 </div>
+                 <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2"><Zap size={18}/> ความไวการสแกน</h4>
+                 <input type="range" min="500" max="3000" step="100" className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer" value={scanDelay} onChange={e => setScanDelay(Number(e.target.value))} />
+                 <button onClick={updateSettings} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black uppercase shadow-lg transition-all">บันทึกตั้งค่า</button>
                </div>
-             </div>
-
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                   <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า</h4>
-                   <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                      <input type="text" className="flex-[2] bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-bold" placeholder="ชื่อสินค้าหลัก" value={inputName} onChange={e => setInputName(e.target.value)} />
-                      <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-black uppercase text-blue-600 text-center" placeholder="ตัวย่อ" maxLength={3} value={inputPrefix} onChange={e => setInputPrefix(e.target.value)} />
-                      <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
-                   </div>
-                   <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold">{masterProducts.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.name} <span className="text-blue-600 ml-2">[{item.prefix}]</span></span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_product_master').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
-                </div>
-                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-                   <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">จัดการหน่วยนับ</h4>
-                   <div className="flex gap-3 mb-6">
-                      <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-bold" placeholder="หน่วยนับ..." value={inputUnit} onChange={e => setInputUnit(e.target.value)} />
-                      <button onClick={() => { supabase.from('settings_units').insert([{unit: inputUnit}]).then(() => {setInputUnit(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
-                   </div>
-                   <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black">{masterUnits.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.unit}</span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_units').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
-                </div>
              </div>
            </div>
         )}
       </main>
 
-      {/* --- MODALS (ปรับปรุงให้รองรับช่องระบุรหัส SKU มือ 15 หลักถาวร) --- */}
+      {/* MODALS */}
       {(isAddModalOpen || isEditModalOpen) && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 text-slate-800">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 text-slate-800 no-print">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-2xl p-8 max-h-[90vh] overflow-y-auto text-slate-900">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-none">{isAddModalOpen ? 'เพิ่มสินค้าใหม่' : 'แก้ไขข้อมูล'}</h3>
               <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-100 rounded-full text-slate-400"><X/></button>
             </div>
             <form onSubmit={isAddModalOpen ? handleAddProduct : handleUpdateProduct} className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-slate-900">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="col-span-full">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ชื่อสินค้าหลัก</label>
-                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none focus:border-blue-500 font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => handleNameSelect(e.target.value, isAddModalOpen)}>
+                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => handleNameSelect(e.target.value, isAddModalOpen)}>
                     <option value="">-- เลือกชื่อสินค้า --</option>
                     {masterProducts.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                   </select>
                 </div>
-
-                {/* 🔒 🤖 เพิ่มช่องป้อนรหัส SKU แมนนวล ล็อกสเปกความยาว 15 หลัก */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
-                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 tracking-widest block mb-2">รหัส SKU คิวอาร์โค้ด (ต้องครบ 15 หลักพอดีเป๊ะ)</label>
-                  <input 
-                    type="text" 
-                    required 
-                    maxLength={15} 
-                    className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl font-mono font-black text-2xl uppercase tracking-widest text-center text-emerald-400 outline-none focus:border-emerald-500"
-                    placeholder="พิมพ์รหัส 15 หลักที่นี่..." 
-                    value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\s+/g, '').toUpperCase();
-                      if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val})
-                      else setEditingProduct({...editingProduct, sku_15_digits: val})
-                    }} 
-                  />
-                  <div className="flex justify-between items-center text-[10px] font-bold mt-2 px-2">
-                    <span className="text-slate-400">ห้ามมีช่องว่าง, ใช้จุดทศนิยมได้</span>
-                    <span className={`text-sm font-black italic ${((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'text-green-400' : 'text-red-400 animate-pulse'}`}>
-                      พิมพ์แล้ว: {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length} / 15 หลัก
-                    </span>
-                  </div>
+                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ล็อกสเปก 15 หลักพอดีเป๊ะ)</label>
+                  <input type="text" required maxLength={15} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl font-mono font-black text-2xl uppercase tracking-widest text-center text-emerald-400 outline-none" placeholder="พิมพ์รหัส 15 หลัก..." value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} onChange={e => { const val = e.target.value.replace(/\s+/g, '').toUpperCase(); if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); else setEditingProduct({...editingProduct, sku_15_digits: val}); }} />
                 </div>
-
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อประเภท</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 uppercase text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อประเภท</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หนา (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">กว้าง (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ยาว (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm text-center" placeholder="เช่น 27/11/2025" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
-                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm outline-none font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
-                <div className="bg-blue-50 rounded-2xl p-4 col-span-full md:col-span-1 shadow-inner border border-blue-100"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label><input type="number" required className="w-full bg-transparent outline-none font-black text-2xl text-blue-600" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center" placeholder="เช่น 27/11/2025" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
+                <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
+                <div className="bg-blue-50 rounded-2xl p-4"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label><input type="number" required className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
               </div>
-              
-              {/* ปุ่มบันทึกจะกดได้ก็ต่อเมื่อตัวอักษรรหัส SKU ยาวครบ 15 หลักพอดีเป๊ะเท่านั้น */}
-              <button 
-                type="submit" 
-                disabled={((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length !== 15}
-                className={`w-full py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl transition-all ${((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'bg-blue-600 text-white active:scale-95 cursor-pointer' : 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-60'}`}
-              >
+              <button type="submit" disabled={((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length !== 15} className={`w-full py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl transition-all ${((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'bg-blue-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                 {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'บันทึกข้อมูลสินค้า' : '❌ กรุณากรอก SKU ให้ครบ 15 หลัก'}
               </button>
             </form>
