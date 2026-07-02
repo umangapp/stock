@@ -24,14 +24,20 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   
+  // แผงควบคุมส่วนกลางจำค่าอัตโนมัติ
   const [companyName, setCompanyName] = useState('บริษัท อุมัง จำกัด')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  
   const [fontSize, setFontSize] = useState(14) 
-  const [qrSize, setQrSize] = useState(90)     
+  const [qrSize, setQrSize] = useState(100)     
 
+  // 🌟 เพิ่มสเปกช่องคีย์ขนาดกรอบ หน่วยเป็นเซนติเมตร (cm) ตามบรีฟพี่ตั้ม 
+  const [frameWidth, setFrameWidth] = useState(6.7)   // ค่าเริ่มต้นกว้าง 6.7 ซม.
+  const [frameHeight, setFrameHeight] = useState(6.7)  // ค่าเริ่มต้นสูง 6.7 ซม.
+
+  // เก็บสถานะตัวเลือกสินค้าแต่ละแถว
   const [itemSettings, setItemSettings] = useState<{[key: string]: { checked: boolean, copies: number, packNo: string, labelAmount: number, showAmount: boolean }}>({})
 
+  // ระบบดักจับดึงข้อมูลล่าสุดจากหน่วยความจำเครื่องคอมพิวเตอร์หน้างาน
   useEffect(() => {
     const savedName = localStorage.getItem('umang_company_name')
     if (savedName) setCompanyName(savedName)
@@ -41,6 +47,12 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
     if (savedFont) setFontSize(Number(savedFont))
     const savedQr = localStorage.getItem('umang_qr_size')
     if (savedQr) setQrSize(Number(savedQr))
+    
+    // ดึงค่าเซนติเมตรที่เคยบันทึกไว้ล่าสุด
+    const savedWidth = localStorage.getItem('umang_frame_width')
+    if (savedWidth) setFrameWidth(Number(savedWidth))
+    const savedHeight = localStorage.getItem('umang_frame_height')
+    if (savedHeight) setFrameHeight(Number(savedHeight))
   }, [])
 
   const handleCompanyNameChange = (val: string) => {
@@ -56,6 +68,17 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const handleQrSizeChange = (val: number) => {
     setQrSize(val)
     localStorage.setItem('umang_qr_size', String(val))
+  }
+
+  // 🔒 ฟังก์ชันบันทึกขนาดเซนติเมตรลงฐานเครื่องคอมหน้างาน
+  const handleFrameWidthChange = (val: number) => {
+    setFrameWidth(val)
+    localStorage.setItem('umang_frame_width', String(val))
+  }
+
+  const handleFrameHeightChange = (val: number) => {
+    setFrameHeight(val)
+    localStorage.setItem('umang_frame_height', String(val))
   }
 
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,12 +131,12 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   return (
     <div className="space-y-8 animate-in fade-in">
       
-      {/* แผงควบคุมตั้งค่าส่วนกลางจำค่าอัตโนมัติ + แถบปรับขนาด Text & QR ด้วยตัวเอง */}
+      {/* แผงควบคุมตั้งค่าระบบบาร์โค้ดปรับขนาดกล่องเซนติเมตร */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 no-print text-slate-800">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สร้างบาร์โค้ดสินค้า</h2>
-            <p className="text-xs text-slate-400 font-bold mt-1">ระบบจัดพิมพ์สติ๊กเกอร์สำเร็จรูปขนาด A4 หน้าละ 12 ดวง สามารถเลื่อนสไลเดอร์ปรับสเกลขนาดได้อิสระ</p>
+            <p className="text-xs text-slate-400 font-bold mt-1">ระบบจัดพิมพ์สติ๊กเกอร์สำเร็จรูปขนาด A4 จัดหน้าดึงค่าเซนติเมตรและเบ่งขนาดคิวอาร์โค้ดได้อิสระ</p>
           </div>
           <button 
             onClick={() => {
@@ -126,7 +149,8 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-slate-100 pt-6">
+        {/* บล็อกกรอกข้อมูลชื่อบริษัท และ แนบไฟล์ภาพโลโก้ */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 border-t border-slate-100 pt-6 items-start">
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 ml-2 block mb-2">1. ข้อความชื่อบริษัทหัวสติ๊กเกอร์ (Auto-Save)</label>
             <input type="text" className="w-full bg-slate-50 border p-4 rounded-2xl font-bold outline-none focus:border-blue-500 text-slate-900" value={companyName} onChange={e => handleCompanyNameChange(e.target.value)} />
@@ -146,31 +170,48 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               ) : <span className="text-xs text-slate-400 font-bold italic">ไม่ได้ฝังโลโก้คิวอาร์</span>}
             </div>
           </div>
+
+          {/* 🌟 🤖 แทรกช่องกรอกขนาดสติกเกอร์เป็นเซนติเมตร (cm) มีผลทั้งหน้าจอและใบปรินท์จริง */}
+          <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-200/60">
+            <label className="text-[10px] font-black uppercase text-blue-600 ml-2 block mb-2">3. กำหนดขนาดกรอบสติ๊กเกอร์หน้างาน (หน่วย: เซนติเมตร)</label>
+            <div className="flex gap-3">
+              <div className="relative flex-1">
+                <input type="number" step="0.1" min="3" max="15" className="w-full bg-white border p-3 rounded-xl font-black text-center pr-10 text-slate-900 outline-none focus:border-blue-500" value={frameWidth} onChange={e => handleFrameWidthChange(parseFloat(e.target.value) || 6.7)} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">ซม.</span>
+              </div>
+              <div className="relative flex-1">
+                <input type="number" step="0.1" min="3" max="15" className="w-full bg-white border p-3 rounded-xl font-black text-center pr-10 text-slate-900 outline-none focus:border-blue-500" value={frameHeight} onChange={e => handleFrameHeightChange(parseFloat(e.target.value) || 6.7)} />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 uppercase">สูง ซม.</span>
+              </div>
+            </div>
+          </div>
         </div>
 
+        {/* แผงแถบเลื่อนสไลเดอร์อัจฉริยะ ขยายพิกัดความกว้างสูงสุด 200px ตามคำขอของพี่ตั้ม */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-slate-100 pt-6 bg-slate-50 p-6 rounded-3xl border">
           <div className="space-y-2">
             <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
-              <Type size={16} className="text-blue-500"/> 3. แถบปรับขนาดตัวหนังสือสติ๊กเกอร์ (ปัจจุบัน: {fontSize}px)
+              <Type size={16} className="text-blue-500"/> 4. แถบปรับขนาดตัวหนังสือสติ๊กเกอร์ (ปัจจุบัน: {fontSize}px)
             </h4>
             <input 
-              type="range" min="12" max="20" step="1" 
+              type="range" min="12" max="24" step="1" 
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
               value={fontSize} onChange={e => handleFontSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่มาก (20px)</span></div>
+            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่มาก (24px)</span></div>
           </div>
 
           <div className="space-y-2">
             <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider flex items-center gap-2">
-              <Move size={16} className="text-emerald-500"/> 4. แถบปรับขนาดรูปกล่อง QR Code (ปัจจุบัน: {qrSize}px)
+              <Move size={16} className="text-emerald-500"/> 5. แถบปรับขนาดรูปกล่อง QR Code (ปัจจุบัน: {qrSize}px)
             </h4>
+            {/* 💥 เบ่งขยายความกว้างสูงสุดได้ถึง 200px เพื่อภาพที่ใหญ่สะใจคนสแกนคลัง */}
             <input 
-              type="range" min="70" max="130" step="5" 
+              type="range" min="70" max="200" step="5" 
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
               value={qrSize} onChange={e => handleQrSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็กกะทัดรัด (70px)</span><span>ใหญ่เต็มดวง (130px)</span></div>
+            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ขยายใหญ่สุด (200px)</span></div>
           </div>
         </div>
       </div>
@@ -179,7 +220,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 no-print text-slate-800">
         <div className="xl:col-span-2 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col max-h-[700px]">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-            <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest ml-2">5. เลือกสินค้า & ใส่โควตาพิมพ์</h4>
+            <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest ml-2">6. เลือกสินค้า & ใส่โควตาพิมพ์</h4>
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
               <input type="text" placeholder="ค้นหาด่วน..." className="w-full bg-slate-50 border p-2 pl-9 rounded-xl text-xs font-bold outline-none" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
@@ -225,25 +266,30 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
           </div>
         </div>
 
-        {/* หน้าต่างจำลองแผ่นป้ายสติ๊กเกอร์ตัวอย่าง */}
+        {/* หน้าต่างจำลองแผ่นป้ายสติ๊กเกอร์ดวงแรก (Live Preview) */}
         <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white flex flex-col h-[700px] shadow-2xl">
-          <h4 className="font-black text-sm uppercase text-blue-400 tracking-widest mb-4 flex items-center gap-2"><Info size={16}/> ตัวอย่างสติ๊กเกอร์ดวงแรก</h4>
-          <div className="flex-1 flex items-center justify-center bg-white/5 rounded-3xl p-4 overflow-hidden">
+          <h4 className="font-black text-sm uppercase text-blue-400 tracking-widest mb-4 flex items-center gap-2"><Info size={16}/> 7. จำลองสติ๊กเกอร์ดวงแรก (Live Preview)</h4>
+          <div className="flex-1 flex items-center justify-center bg-white/5 rounded-3xl p-4 overflow-auto">
             {printCards.length > 0 ? (
-              /* 🌟 ปรับปลดล็อกเปลี่ยนจาก minHeight คงที่ เป็นปรับตัวยืดหดออโต้ไม่บีบตัวหนังสือ */
-              <div className="bg-white text-slate-900 p-5 rounded-2xl w-full max-w-[270px] shadow-lg flex flex-col justify-between border border-slate-200 h-auto min-h-[350px]">
-                <div className="font-bold text-slate-900 leading-normal flex-shrink-0" style={{ fontSize: `${fontSize}px` }}>
-                  <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight text-sm" style={{ fontSize: `${fontSize + 1}px` }}>{companyName}</p>
-                  <p className="mt-1.5"><span className="text-slate-400 font-black uppercase">Pack No. :</span> {printCards[0].packNo}</p>
-                  <p className="truncate"><span className="text-slate-400 font-black uppercase">ตัวย่อ :</span> {printCards[0].prefix}: {printCards[0].name}</p>
-                  <p><span className="text-slate-400 font-black uppercase">ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
-                  {printCards[0].showAmount && <p><span className="text-slate-400 font-black uppercase">จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
-                  <p><span className="text-slate-400 font-black uppercase">Lot Date :</span> {printCards[0].received_date}</p>
-                </div>
-                {/* 🌟 บล็อกคิวอาร์โค้ดเพิ่ม flex-shrink-0 กันโดนบีบหาย */}
-                <div className="mt-3 flex flex-col items-center gap-1 bg-slate-50 p-2 rounded-xl border border-slate-200 flex-shrink-0">
-                  <QRCodeCanvas { /* @ts-ignore */ ...{}} value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.2), width: Math.floor(qrSize*0.2), excavate: true } : undefined} />
-                  <span className="font-mono font-black tracking-widest mt-1 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px` }}>{printCards[0].sku_15_digits}</span>
+              /* 🌟 🤖 ล็อกกรอบตามเซนติเมตร และจัดสไตล์ 2 ฝั่ง ซ้าย-ขวา ป้องกันอักษรซ้อนทับกันอย่างเด็ดขาด */
+              <div className="bg-white text-slate-900 p-4 rounded-xl shadow-lg flex flex-col justify-between border border-slate-200 overflow-hidden shrink-0" style={{ width: `${frameWidth}cm`, height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
+                <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight truncate shrink-0" style={{ fontSize: `${fontSize + 2}px`, margin: '0 0 4px 0' }}>{companyName}</p>
+                
+                {/* แผงเนื้อหารุ่นใหม่ แบ่ง 2 ปีกข้างป้องกันคำซ้อนเหลื่อม */}
+                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
+                  {/* ฝั่งซ้าย: ข้อมูลสินค้า */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
+                    <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
+                    <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {printCards[0].prefix} : {printCards[0].name}</p>
+                    <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
+                    {printCards[0].showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
+                    <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {printCards[0].received_date}</p>
+                  </div>
+                  {/* ฝั่งขวา: รูปคิวอาร์โค้ด + SKU */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <QRCodeCanvas { /* @ts-ignore */ ...{} } value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
+                    <span className="font-mono font-black tracking-widest mt-1 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
+                  </div>
                 </div>
               </div>
             ) : <div className="text-center text-slate-500 font-bold italic text-sm">ติ๊กเลือกสินค้าด้านซ้าย<br/>เพื่อเปิดดูภาพสติกเกอร์ตัวอย่าง</div>}
@@ -254,24 +300,27 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
       {/* หน้าจอพรีวิวแบบตารางรวม 3x4 บนหน้าเว็บแอปหลัก (no-print) */}
       {printCards.length > 0 && (
         <div className="no-print bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-sm">
-          <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ โครงสร้างจำลองก่อนส่งพิมพ์ลงแผ่น A4 (หน้าละ 12 ดวง)</h4>
+          <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ 8. ตัวอย่างจัดหน้ากระดาษ A4 (3x4 Layout)</h4>
           <div className="bg-slate-100 p-4 rounded-3xl overflow-x-auto">
             <div className="w-[210mm] bg-white border shadow-inner p-[5mm] mx-auto min-h-[297mm]">
-              <div className="grid grid-cols-3 gap-3">
+              {/* แผงตารางเรียงการ์ดตามขนาด cm จริง ไม่ล็อกตายตัวเพื่อให้ยืดหยุ่นหน้างานสูงสุด */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4mm', alignContent: 'flex-start' }}>
                 {printCards.map((card, idx) => (
-                  /* 🌟 ปรับตรงจำลองแผงพริ้นต์ให้ใช้ minHeight และขยายความสูงตามจริง */
-                  <div key={idx} className="border border-slate-300 rounded-lg p-3 flex flex-col justify-between bg-white text-slate-900 h-auto min-h-[67mm]" style={{ boxSizing: 'border-box' }}>
-                    <div className="font-bold leading-normal text-slate-900 flex-shrink-0" style={{ fontSize: `${fontSize}px` }}>
-                      <p className="text-center font-black border-b border-slate-200 pb-0.5 text-blue-600 uppercase text-xs truncate" style={{ fontSize: `${fontSize + 1}px` }}>{companyName}</p>
-                      <p className="mt-1"><span className="text-slate-400 font-black">Pack No. :</span> {card.packNo}</p>
-                      <p className="truncate"><span className="text-slate-400 font-black">ตัวย่อ :</span> {card.prefix}: {card.name}</p>
-                      <p><span className="text-slate-400 font-black">ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
-                      {card.showAmount && <p><span className="text-slate-400 font-black">จำนวน :</span> {card.labelAmount} {card.unit}</p>}
-                      <p><span className="text-slate-400 font-black">Lot Date :</span> {card.received_date}</p>
-                    </div>
-                    <div className="flex flex-col items-center mt-1 bg-slate-50 p-1 rounded border border-slate-100 flex-shrink-0">
-                      <QRCodeCanvas { /* @ts-ignore */ ...{}} value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.2), width: Math.floor((qrSize-10)*0.2), excavate: true } : undefined} />
-                      <span className="font-mono font-black tracking-wider mt-0.5 text-slate-800" style={{ fontSize: `${Math.max(8, fontSize - 4)}px` }}>{card.sku_15_digits}</span>
+                  <div key={idx} className="border border-slate-300 bg-white text-slate-900 p-3 rounded flex flex-col justify-between overflow-hidden shrink-0" style={{ width: `${frameWidth}cm`, height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
+                    <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 3px 0' }} className="truncate">{companyName}</p>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '2mm' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
+                        <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                        <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
+                        <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
+                        {card.showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
+                        <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <QRCodeCanvas { /* @ts-ignore */ ...{} } value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.22), width: Math.floor((qrSize-10)*0.22), excavate: true } : undefined} />
+                        <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(8, fontSize - 4)}px`, letterSpacing: '0.05em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -281,25 +330,29 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       )}
 
-      {/* โครงสร้างสำหรับยิงเข้ากระดาษพิมพ์สติกเกอร์ / PDF ตัวจริง (ปลดล็อกความสูงขยายตามสเกลสไลเดอร์ 100%) */}
+      {/* 🔒 🖨️ โครงสร้างสำหรับส่งออกไปที่เครื่องพิมพ์ / บันทึกเป็น PDF ตัวจริง (ยืดหยุ่นตามค่า cm และสไลเดอร์ 100%) */}
       <div className="print-area hidden">
         {Array.from({ length: Math.ceil(printCards.length / 12) }).map((_, pageIdx) => (
-          <div key={pageIdx} className="sticker-page">
+          <div key={pageIdx} className="sticker-page" style={{ display: 'flex', flexWrap: 'wrap', gap: '4mm', alignContent: 'flex-start', padding: '6mm 5mm', width: '210mm', minHeight: '297mm', pageBreakAfter: 'always', boxSizing: 'border-box', backgroundColor: '#ffffff' }}>
             {printCards.slice(pageIdx * 12, (pageIdx + 1) * 12).map((card, idx) => (
-              /* 🌟 ปลดล็อกกรอกขนาดแผ่นจริงให้ใช้ min-height ขยายตามมือสไลเดอร์ */
-              <div key={idx} className="sticker-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', boxSizing: 'border-box', pageBreakInside: 'avoid', height: 'auto', minHeight: '67mm' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flexShrink: 0 }}>
-                  <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px` }}>{companyName}</p>
-                  <p style={{ margin: '2px 0 0 0' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
-                  <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix}: {card.name}</p>
-                  <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
-                  {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
-                  <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+              <div key={idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', boxSizing: 'border-box', pageBreakInside: 'avoid', width: `${frameWidth}cm`, height: `${frameHeight}cm`, backgroundColor: '#ffffff', overflow: 'hidden' }}>
+                
+                <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyName}</p>
+                
+                <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                    <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                    <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
+                    <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
+                    {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
+                    <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <QRCodeCanvas { /* @ts-ignore */ ...{} } value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
+                    <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.05em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
+                  </div>
                 </div>
-                <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', alignItems: 'center', backgroundColor: '#f8fafc', padding: '5px', borderRadius: '6px', border: '1px solid #e2e8f0', flexShrink: 0 }}>
-                  <QRCodeCanvas { /* @ts-ignore */ ...{}} value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.2), width: Math.floor(qrSize*0.2), excavate: true } : undefined} />
-                  <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.1em', marginTop: '3px', color: '#000000' }}>{card.sku_15_digits}</span>
-                </div>
+
               </div>
             ))}
           </div>
