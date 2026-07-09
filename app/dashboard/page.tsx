@@ -46,16 +46,25 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
+// 🌟 🤖 อัปเดตปรับปรุงตัวคัดกรองแยกสี SKU ใหม่ แก้ไขปัญหาสีเพี้ยนจากรูปภาพ image_8e2f8e.png
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/x+$/);
+  
+  // 🔒 เปลี่ยนมาใช้ /[xX]+$/ เพื่อดักจับทั้ง x ตัวเล็ก และ X ตัวใหญ่หน้างาน
+  const paddingMatch = sku.match(/[xX]+$/); 
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
-  const colors = isDark ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-cyan-300" } : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-cyan-500" };
+  
+  // 🔒 เปลี่ยนสีของกล่อง 'pad' จากโค้ดสีฟ้าเดิม ให้กลายเป็นสีเทา (text-slate-400 / text-slate-500) ตามบรีฟพี่ตั้มครับ
+  const colors = isDark 
+    ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } 
+    : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
+    
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -190,12 +199,11 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
-  // 🔒 🤖 ดักเก็บค่าตัวย่อฝังติดเข้าไปในกลุ่มสินค้าหลักเพื่อเอาไว้สั่งเรียงลำดับ
   const groupedInventory = products.reduce((acc: any, item: any) => {
     if (!acc[item.name]) {
       acc[item.name] = { 
         name: item.name, 
-        prefix: item.prefix || 'XXX', // ดึงตัวย่อมาผูกไว้ที่หัวกลุ่ม
+        prefix: item.prefix || 'XXX', 
         totalStock: 0, 
         unit: item.unit, 
         items: [] 
@@ -264,7 +272,6 @@ export default function AdminDashboard() {
                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* 🌟 🤖 สั่งกรองค้นหา และ วิ่งจัดเรียงลำดับจากตัวย่อ Prefix น้อยไปมาก (A-Z) ตามสั่งของพี่ตั้มเป๊ะๆ */}
               {Object.values(groupedInventory)
                 .filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase()) || g.prefix.toLowerCase().includes(searchQuery.toLowerCase()))
                 .sort((a: any, b: any) => a.prefix.localeCompare(b.prefix))
@@ -272,7 +279,6 @@ export default function AdminDashboard() {
                 <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit">
                   <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center text-slate-800">
                     <div className="flex-1 pr-4">
-                      {/* 🌟 ดึงตัวย่อมาสลักไว้ด้านหน้าชื่อกลุ่มแยกสีสวยงามตรงตามรูปภาพ image_8e2447.png */}
                       <h3 className="font-black uppercase text-xl tracking-tighter break-words">
                         <span className="text-blue-600 mr-2">{group.prefix}:</span>{group.name}
                       </h3>
