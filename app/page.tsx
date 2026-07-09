@@ -3,18 +3,22 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { QrCode, Zap, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
 
-// 🌟 🤖 ฟังก์ชันแยกสี SKU ตัวปรับปรุง (รองรับ X ใหญ่ + ปรับท้ายเป็นสีเทา) ผ่านฉลุยรันตรงล็อค
+// 🔒 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (แก้ปัญหาสีเลื่อนจากภาพ image_8ea7cb.png รองรับ X ใหญ่ + เปลี่ยนท้ายเป็นสีเทา)
 const SKUColored = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
+  const cleanSku = sku.trim(); // ล้างช่องว่างเผื่อพนักงานเคาะวรรค
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/[xX]+$/);
+  
+  // 🎯 เปลี่ยนตัวดักจับเป็น /[xX]+$/ เพื่อล็อกเป้าทั้ง x เล็ก และ X ใหญ่หน้างานไม่ให้หลุดตำแหน่ง
+  const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
   
-  const p1 = sku.substring(0, preLen);
-  const p4 = sku.substring(sku.length - paddingLen);
-  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
-  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+  const p1 = cleanSku.substring(0, preLen);
+  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
+  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
+  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
   
+  // 🎨 ตั้งค่าชุดสีอัปเกรด บังคับตัวปิดท้าย (pad) ให้เป็นสีเทา Slate สบายตา
   const colors = isDark 
     ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } 
     : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
@@ -26,6 +30,8 @@ const SKUColored = ({ sku, prefix, isDark = false }: { sku: string; prefix: stri
       <span className={colors.lot}>{p3}</span>
       <span className={colors.pad}>{p4}</span>
     </span>
+  );
+};
   );
 };
 
