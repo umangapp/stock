@@ -3,13 +3,12 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { QrCode, Zap, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
 
-// 🔒 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (แก้ปัญหาสีเลื่อนจากภาพ image_8ea7cb.png รองรับ X ใหญ่ + เปลี่ยนท้ายเป็นสีเทา)
+// 🌟 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (ดักจับ X ใหญ่ + ปลายสายสีเทา Slate + เคลียร์เศษปีกกาซ้อนแล้ว)
 const SKUColored = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
-  const cleanSku = sku.trim(); // ล้างช่องว่างเผื่อพนักงานเคาะวรรค
+  const cleanSku = sku.trim(); 
   const preLen = prefix?.length || 2;
   
-  // 🎯 เปลี่ยนตัวดักจับเป็น /[xX]+$/ เพื่อล็อกเป้าทั้ง x เล็ก และ X ใหญ่หน้างานไม่ให้หลุดตำแหน่ง
   const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
   
@@ -18,7 +17,6 @@ const SKUColored = ({ sku, prefix, isDark = false }: { sku: string; prefix: stri
   const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
   const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
   
-  // 🎨 ตั้งค่าชุดสีอัปเกรด บังคับตัวปิดท้าย (pad) ให้เป็นสีเทา Slate สบายตา
   const colors = isDark 
     ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } 
     : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
@@ -30,8 +28,6 @@ const SKUColored = ({ sku, prefix, isDark = false }: { sku: string; prefix: stri
       <span className={colors.lot}>{p3}</span>
       <span className={colors.pad}>{p4}</span>
     </span>
-  );
-};
   );
 };
 
@@ -59,7 +55,6 @@ export default function ScanPage() {
     inputRef.current?.focus()
   }, [])
 
-  // บังคับให้ช่องกรอก Focus ตลอดเวลา สำหรับใช้ร่วมกับปืนยิงบาร์โค้ดหน้างาน
   const handleBlur = () => {
     setTimeout(() => inputRef.current?.focus(), 100)
   }
@@ -77,7 +72,6 @@ export default function ScanPage() {
     setStatus({ type: 'idle', message: '' })
 
     try {
-      // 1. ตรวจสอบสินค้าในฐานข้อมูล
       const { data: product, error: pError } = await supabase
         .from('products')
         .select('*')
@@ -91,7 +85,6 @@ export default function ScanPage() {
         return
       }
 
-      // 2. คำนวณจำนวนยอดสต๊อกใหม่
       const changeAmount = 1
       const newStock = scanMode === 'receive' 
         ? product.current_stock + changeAmount 
@@ -104,13 +97,11 @@ export default function ScanPage() {
         return
       }
 
-      // 3. อัปเดตยอดลงตารางสินค้า
       await supabase
         .from('products')
         .update({ current_stock: newStock })
         .eq('id', product.id)
 
-      // 4. บันทึกประวัติการสแกนเข้าตารางธุรกรรม
       await supabase
         .from('transactions')
         .insert([{
@@ -136,7 +127,6 @@ export default function ScanPage() {
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center p-4 md:p-8 font-sans">
       
-      {/* ส่วนหัวหน้าแอป */}
       <div className="w-full max-w-xl text-center my-6">
         <h1 className="text-3xl font-black uppercase tracking-tight text-blue-400 italic flex items-center justify-center gap-2">
           <QrCode size={32}/> Umang Terminal
@@ -144,7 +134,6 @@ export default function ScanPage() {
         <p className="text-[11px] text-slate-500 font-bold uppercase tracking-widest mt-1">ระบบสแกนรับเข้า-จ่ายออก คลังสินค้าชิ้นงาน</p>
       </div>
 
-      {/* แผงปุ่มสลับโหมดการทำงาน */}
       <div className="w-full max-w-xl grid grid-cols-2 gap-4 mb-6">
         <button 
           onClick={() => setLayoutMode('receive')}
@@ -160,7 +149,6 @@ export default function ScanPage() {
         </button>
       </div>
 
-      {/* ฟอร์มรับแรงกระแทกจากปืนยิงบาร์โค้ด */}
       <form onSubmit={handleScanSubmit} className="w-full max-w-xl bg-slate-900 border border-slate-800 p-6 rounded-[2.5rem] shadow-xl text-center space-y-4">
         <div className="relative">
           <input 
@@ -177,7 +165,6 @@ export default function ScanPage() {
           <Zap size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-500/50 animate-pulse" />
         </div>
 
-        {/* แสดงกล่องสถานะผลลัพธ์การยิง */}
         {status.type !== 'idle' && (
           <div className={`p-4 rounded-xl flex items-center gap-3 text-left border ${status.type === 'success' ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : 'bg-red-950/40 border-red-500/30 text-red-300'}`}>
             {status.type === 'success' ? <CheckCircle2 size={20} className="shrink-0"/> : <AlertTriangle size={20} className="shrink-0"/>}
@@ -186,7 +173,6 @@ export default function ScanPage() {
         )}
       </form>
 
-      {/* บล็อกโชว์รายการยิงล่าสุดของพนักงานคลัง */}
       <div className="w-full max-w-xl mt-8 space-y-4">
         <h3 className="font-black uppercase text-xs text-slate-500 tracking-widest flex items-center gap-2">
           <RefreshCw size={14}/> ประวัติการยิงล่าสุด (5 รายการล่าสุด)
