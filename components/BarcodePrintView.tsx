@@ -196,7 +196,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               <Type size={16} className="text-blue-500"/> 4. แถบปรับขนาดตัวหนังสือ (ปัจจุบัน: {fontSize}px)
             </h4>
             <input 
-              type="range" min="12" max="24" step="1" 
+              type="range" min="16" max="40" step="1" 
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
               value={fontSize} onChange={e => handleFontSizeChange(Number(e.target.value))} 
             />
