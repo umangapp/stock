@@ -272,10 +272,18 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                       <input type="checkbox" id={`showAmount-${item.id}`} className="w-4 h-4 rounded cursor-pointer accent-blue-600" checked={state.showAmount} onChange={e => updateItemSetting(item.id, 'showAmount', e.target.checked)} />
                       <label htmlFor={`showAmount-${item.id}`} className="text-xs font-bold text-slate-700 cursor-pointer select-none">แสดงจำนวน</label>
                     </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 block font-black uppercase mb-1">Pack No.</span>
-                      <input type="text" className="w-20 bg-white border p-2 h-[38px] rounded-xl text-xs font-bold text-center" placeholder="เช่น P-01" value={state.packNo} onChange={e => updateItemSetting(item.id, 'packNo', e.target.value)} />
-                    </div>
+                      <div className="my-4"> {/* เพิ่ม Class "my-4" หรือเปลี่ยนเป็นค่าระยะที่ต้องการ เช่น my-2, my-6 */}
+                        <span className="text-[9px] text-slate-400 block font-black uppercase mb-1">
+                          Pack No.
+                        </span>
+                        <input
+                          type="text"
+                          className="w-20 bg-white border p-2 h-[38px] rounded-xl text-xs font-bold text-center"
+                          placeholder="เช่น P-01"
+                          value={state.packNo}
+                          onChange={(e) => updateItemSetting(item.id, "packNo", e.target.value)}
+                        />
+                      </div>
                     {state.showAmount && (
                       <div>
                         <span className="text-[9px] text-blue-500 block font-black uppercase mb-1">ระบุจำนวน ({item.unit})</span>
