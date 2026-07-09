@@ -1,23 +1,33 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { useRouter } from 'next/navigation' // 🌟 แก้ไขจุดนี้นำเข้าถูกต้องแล้วครับ
+import { useRouter } from 'next/navigation' 
 import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info } from 'lucide-react'
 import SingleScanner from './SingleScanner'
 import BatchScanner from './BatchScanner'
 
+// 🌟 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (ดักจับ X ใหญ่ + ปลายสายปรับเป็นสีเทา Slate ตามสั่งเรียบร้อยครับพี่ตั้ม)
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
+  const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/x+$/);
+  
+  // 🔒 เปลี่ยนเป็น /[xX]+$/ เพื่อดักจับทั้ง x เล็ก และ X ใหญ่ ไม่ให้ตำแหน่งตัวเลขเลื่อนพัง
+  const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  const p1 = sku.substring(0, preLen);
-  const p4 = sku.substring(sku.length - paddingLen);
-  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
-  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+  
+  const p1 = cleanSku.substring(0, preLen);
+  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
+  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
+  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  
   return (
     <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[11px]">
-      <span className="text-blue-600">{p1}</span><span className="text-green-600">{p2}</span><span className="text-orange-500">{p3}</span><span className="text-cyan-400">{p4}</span>
+      <span className="text-blue-600">{p1}</span>
+      <span className="text-green-600">{p2}</span>
+      <span className="text-orange-500">{p3}</span>
+      {/* 🔒 เปลี่ยนจาก text-cyan-400 เดิม ให้กลายเป็นสีเทา text-slate-400 ตามสเปกใหม่ครับ */}
+      <span className="text-slate-400">{p4}</span>
     </span>
   );
 };
