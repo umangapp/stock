@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import { APP_VERSION_FALLBACK } from '@/lib/version'
 import * as XLSX from 'xlsx'
-// 🌟 อิมพอร์ตโมดูลสติกเกอร์บาร์โค้ดแยกไฟล์ที่เราเพิ่งสร้างขึ้นมา
 import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
@@ -201,31 +200,22 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
       
-      {/* 🌟 สไตล์ชีทคุมระบบตัดหน้ากระดาษ A4 สำหรับพิมพ์สติ๊กเกอร์ชุด (ล็อกสัดส่วนดวงให้พอดีเป๊ะ) */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
           main { padding: 0 !important; overflow: visible !important; }
           .print-area { display: block !important; width: 210mm; background: white; }
           .sticker-page { 
-            display: grid !important; 
-            grid-template-columns: repeat(3, 1fr) !important; 
-            grid-template-rows: repeat(4, 1fr) !important;
-            gap: 5mm !important;
+            display: flex !important; 
+            flex-wrap: wrap !important; 
+            gap: 4mm !important;
+            align-content: flex-start !important;
             padding: 6mm 5mm !important;
-            height: 297mm !important; 
+            width: 210mm !important;
+            min-height: 297mm !important; 
             page-break-after: always !important;
             box-sizing: border-box !important;
-          }
-          .sticker-card { 
-            border: 1px solid #94a3b8 !important;
-            padding: 4mm !important;
-            border-radius: 6px !important;
-            display: flex !important;
-            flex-direction: column !important;
-            justify-content: space-between !important;
-            box-sizing: border-box !important;
-            page-break-inside: avoid !important;
+            background-color: #ffffff !important;
           }
         }
       `}</style>
@@ -253,7 +243,6 @@ export default function AdminDashboard() {
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
-        
         {/* TAB: สต๊อกสินค้า */}
         {activeTab === 'inventory' && (
           <div className="space-y-8 animate-in fade-in no-print">
@@ -304,7 +293,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 🌟 TAB: สร้างบาร์โค้ด (เรียกใช้ Component ตัวใหม่ที่เราเพิ่งแยกไฟล์ออกมา) 🌟 */}
+        {/* TAB: สร้างบาร์โค้ด */}
         {activeTab === 'barcode' && (
           <BarcodePrintView products={products} />
         )}
@@ -345,10 +334,11 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* TAB: ตั้งค่าระบบ */}
+        {/* 🌟 TAB: ตั้งค่าระบบ (ดึงตารางเพิ่มตัวย่อสินค้าหลักคืนชีพกลับมาเรียบร้อยแล้ว) */}
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">System Settings</h2>
+             
              <div className="bg-slate-900 p-8 rounded-[2.5rem] border border-blue-500/20 shadow-xl text-white mb-8 space-y-8">
                <div className="space-y-4">
                  <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2"><Info size={18}/> App Version</h4>
@@ -360,6 +350,29 @@ export default function AdminDashboard() {
                  <button onClick={updateSettings} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black uppercase shadow-lg transition-all">บันทึกตั้งค่า</button>
                </div>
              </div>
+
+             {/* 🌟 🤖 คืนค่าบอร์ดจัดตั้งมาสเตอร์ตัวย่อสินค้าและหน่วยนับ ยืนยันทำงานได้สมบูรณ์แบบ */}
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                   <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า (ตัวย่อ/Prefix)</h4>
+                   <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                      <input type="text" className="flex-[2] bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-bold" placeholder="ชื่อสินค้าหลัก" value={inputName} onChange={e => setInputName(e.target.value)} />
+                      <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-black uppercase text-blue-600 text-center" placeholder="ตัวย่อ" maxLength={3} value={inputPrefix} onChange={e => setInputPrefix(e.target.value)} />
+                      <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
+                   </div>
+                   <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold">{masterProducts.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.name} <span className="text-blue-600 ml-2">[{item.prefix}]</span></span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_product_master').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
+                </div>
+
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                   <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">จัดการหน่วยนับ</h4>
+                   <div className="flex gap-3 mb-6">
+                      <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-bold" placeholder="หน่วยนับ..." value={inputUnit} onChange={e => setInputUnit(e.target.value)} />
+                      <button onClick={() => { supabase.from('settings_units').insert([{unit: inputUnit}]).then(() => {setInputUnit(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
+                   </div>
+                   <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black">{masterUnits.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.unit}</span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_units').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
+                </div>
+             </div>
+
            </div>
         )}
       </main>
