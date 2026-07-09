@@ -28,23 +28,32 @@ const playErrorSound = () => {
   oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
 };
 
+// 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU ประจำหน้าป๊อปอัป (ดักจับ X ใหญ่ + ปลายนิ้วสีเทา ตรงล็อคตามบรีฟ 100% ครับ)
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
+  const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/x+$/);
+  
+  // 🔒 เปลี่ยนเป็น /[xX]+$/ ดักสแกนทลายบั๊ก X ตัวใหญ่เลื่อนพิกัดสี
+  const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  const p1 = sku.substring(0, preLen);
-  const p4 = sku.substring(sku.length - paddingLen);
-  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
-  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+  
+  const p1 = cleanSku.substring(0, preLen);
+  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
+  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
+  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  
   return (
     <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px]">
-      <span className="text-blue-600">{p1}</span><span className="text-green-600">{p2}</span><span className="text-orange-500">{p3}</span><span className="text-cyan-400">{p4}</span>
+      <span className="text-blue-600">{p1}</span>
+      <span className="text-green-600">{p2}</span>
+      <span className="text-orange-500">{p3}</span>
+      {/* 🎨 ขัดผิวตัวเติมเต็มท้ายรหัส จากสีฟ้าครามเดิม เปลี่ยนเป็นสีเทา text-slate-400 เท่ๆ ครับพี่ */}
+      <span className="text-slate-400">{p4}</span>
     </span>
   );
 };
 
-// 🌟 เพิ่มการรับ prop: initialSKU เข้ามาเช็ก 🌟
 export default function SingleScanner({ scanMode, activeUser, initialSKU, onClose, onRefresh }: any) {
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [singleAmount, setSingleAmount] = useState(1)
@@ -62,7 +71,6 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
         aspectRatio: 1.0 
       }, handleScan, () => {})
 
-      // 🌟 ถ้าผู้ใช้งานคีย์มือส่งรหัสเข้ามา ให้ประมวลผลทันทีโดยไม่ต้องรอสแกนกล้อง 🌟
       if (initialSKU && initialSKU.trim() !== '') {
          handleScan(initialSKU);
       }
@@ -72,7 +80,7 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
   }, [initialSKU])
 
   const handleScan = async (sku: string) => {
-    if (isScanLocked.current && !initialSKU) return; // ล็อกเฉพาะกรณีสแกนกล้องต่อเนื่อง
+    if (isScanLocked.current && !initialSKU) return; 
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
     if (!p) { alert("❌ ไม่พบข้อมูลสินค้ารหัสนี้ในระบบ"); isScanLocked.current = false; if(initialSKU) onClose(); return; }
     
@@ -94,7 +102,7 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
     await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id);
     await supabase.from('transactions').insert([{ product_id: selectedProduct.id, type: scanMode, amount: singleAmount, old_stock: oldStock, new_stock: newStock, created_by: activeUser }]);
     onRefresh(); setShowSummaryModal(false); isScanLocked.current = false;
-    onClose(); // บันทึกเสร็จให้เด้งกลับหน้าหลักเพื่อความลื่นไหล
+    onClose(); 
   }
 
   return (
