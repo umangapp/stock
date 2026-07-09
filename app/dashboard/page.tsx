@@ -190,8 +190,17 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
+  // 🔒 🤖 ดักเก็บค่าตัวย่อฝังติดเข้าไปในกลุ่มสินค้าหลักเพื่อเอาไว้สั่งเรียงลำดับ
   const groupedInventory = products.reduce((acc: any, item: any) => {
-    if (!acc[item.name]) acc[item.name] = { name: item.name, totalStock: 0, unit: item.unit, items: [] };
+    if (!acc[item.name]) {
+      acc[item.name] = { 
+        name: item.name, 
+        prefix: item.prefix || 'XXX', // ดึงตัวย่อมาผูกไว้ที่หัวกลุ่ม
+        totalStock: 0, 
+        unit: item.unit, 
+        items: [] 
+      };
+    }
     acc[item.name].totalStock += item.current_stock;
     acc[item.name].items.push(item);
     return acc;
@@ -255,11 +264,18 @@ export default function AdminDashboard() {
                </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {Object.values(groupedInventory).filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase())).map((group: any) => (
+              {/* 🌟 🤖 สั่งกรองค้นหา และ วิ่งจัดเรียงลำดับจากตัวย่อ Prefix น้อยไปมาก (A-Z) ตามสั่งของพี่ตั้มเป๊ะๆ */}
+              {Object.values(groupedInventory)
+                .filter((g: any) => g.name.toLowerCase().includes(searchQuery.toLowerCase()) || g.prefix.toLowerCase().includes(searchQuery.toLowerCase()))
+                .sort((a: any, b: any) => a.prefix.localeCompare(b.prefix))
+                .map((group: any) => (
                 <div key={group.name} className="bg-white rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden h-fit">
                   <div onClick={() => setExpandedGroups(prev => prev.includes(group.name) ? prev.filter(n => n !== group.name) : [...prev, group.name])} className="p-7 cursor-pointer hover:bg-slate-50 flex justify-between items-center text-slate-800">
                     <div className="flex-1 pr-4">
-                      <h3 className="font-black uppercase text-xl tracking-tighter break-words">{group.name}</h3>
+                      {/* 🌟 ดึงตัวย่อมาสลักไว้ด้านหน้าชื่อกลุ่มแยกสีสวยงามตรงตามรูปภาพ image_8e2447.png */}
+                      <h3 className="font-black uppercase text-xl tracking-tighter break-words">
+                        <span className="text-blue-600 mr-2">{group.prefix}:</span>{group.name}
+                      </h3>
                       <p className="text-[10px] font-bold text-slate-400 uppercase mt-1 italic tracking-widest">Total {group.items.length} SKU</p>
                     </div>
                     <div className="text-right shrink-0">
@@ -334,7 +350,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 🌟 TAB: ตั้งค่าระบบ (ดึงตารางเพิ่มตัวย่อสินค้าหลักคืนชีพกลับมาเรียบร้อยแล้ว) */}
+        {/* TAB: ตั้งค่าระบบ */}
         {activeTab === 'settings' && (
            <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
              <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">System Settings</h2>
@@ -347,11 +363,10 @@ export default function AdminDashboard() {
                <div className="space-y-4 border-t border-white/5 pt-8">
                  <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2"><Zap size={18}/> ความไวการสแกน</h4>
                  <input type="range" min="500" max="3000" step="100" className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer" value={scanDelay} onChange={e => setScanDelay(Number(e.target.value))} />
-                 <button onClick={updateSettings} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black uppercase shadow-lg transition-all">บันทึกตั้งค่า</button>
+                 <button onClick={updateSettings} className="bg-blue-600 text-white px-12 py-5 rounded-2xl font-black uppercase shadow-lg active:scale-95 transition-all">บันทึกตั้งค่า</button>
                </div>
              </div>
 
-             {/* 🌟 🤖 คืนค่าบอร์ดจัดตั้งมาสเตอร์ตัวย่อสินค้าและหน่วยนับ ยืนยันทำงานได้สมบูรณ์แบบ */}
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
                    <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า (ตัวย่อ/Prefix)</h4>
