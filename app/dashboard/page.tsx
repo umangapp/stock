@@ -46,25 +46,16 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 🤖 อัปเดตปรับปรุงตัวคัดกรองแยกสี SKU ใหม่ แก้ไขปัญหาสีเพี้ยนจากรูปภาพ image_8e2f8e.png
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
   const preLen = prefix?.length || 2;
-  
-  // 🔒 เปลี่ยนมาใช้ /[xX]+$/ เพื่อดักจับทั้ง x ตัวเล็ก และ X ตัวใหญ่หน้างาน
-  const paddingMatch = sku.match(/[xX]+$/); 
+  const paddingMatch = sku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  
   const p1 = sku.substring(0, preLen);
   const p4 = sku.substring(sku.length - paddingLen);
   const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
-  
-  // 🔒 เปลี่ยนสีของกล่อง 'pad' จากโค้ดสีฟ้าเดิม ให้กลายเป็นสีเทา (text-slate-400 / text-slate-500) ตามบรีฟพี่ตั้มครับ
-  const colors = isDark 
-    ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } 
-    : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
-    
+  const colors = isDark ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
   return (
     <span className="font-mono font-black tracking-widest uppercase italic">
       <span className={colors.pre}>{p1}</span>
@@ -320,7 +311,7 @@ export default function AdminDashboard() {
           <BarcodePrintView products={products} />
         )}
 
-        {/* TAB: ภาพรวมระบบ */}
+        {/* 🌟 TAB: ภาพรวมระบบ (Activity Feed เพิ่มวันที่อัปเดต + ขนาดกับล็อตใหญ่ขึ้น 2 Step เคลียร์เรียบร้อยครับพี่ตั้ม) */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in no-print">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -338,14 +329,28 @@ export default function AdminDashboard() {
                           <div className="flex justify-between items-start">
                             <div className="flex-1">
                                 <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
-                                <div className="flex items-center gap-2 mt-2">
-                                    <p className="text-[10px] font-bold text-slate-400 italic uppercase">ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.</p>
-                                    <span className="text-[9px] font-black text-slate-500 uppercase italic bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Lot: {log.products?.received_date}</span>
+                                <div className="flex flex-wrap items-center gap-2 mt-2 leading-none">
+                                    {/* 🌟 ขนาดขยายใหญ่ 2 Step จาก 10px ➡️ เป็น 14px หนา คมชัด */}
+                                    <p className="text-[14px] font-black text-slate-600 uppercase tracking-tight">ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.</p>
+                                    {/* 🌟 ล็อตขยายใหญ่ 2 Step จาก 9px ➡️ เป็น 13px สีเข้มเด่นสะดุดตา */}
+                                    <span className="text-[13px] font-black text-slate-800 uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Lot: {log.products?.received_date}</span>
                                 </div>
                             </div>
                             <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
+                          
+                          {/* 🌟 🤖 เพิ่มแท็บบรรทัดวันที่และเวลาที่อัปเดตล่าสุดของพนักงานแต่ละคนตามบรีฟเป๊ะๆ ครับพี่ตั้ม */}
+                          <div className="pt-2.5 mt-0.5 border-t border-slate-100 flex justify-between items-center text-[11px] font-bold text-slate-400">
+                            <div className="flex items-center gap-1">
+                              <Clock size={12} className="text-slate-400" />
+                              <span>{new Date(log.created_at).toLocaleDateString('th-TH')} | {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
+                            </div>
+                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${log.type === 'receive' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 'text-red-600 bg-red-50 border border-red-100'}`}>
+                              {log.type === 'receive' ? 'สแกนเข้าคลัง' : 'สแกนจ่ายออก'}
+                            </span>
+                          </div>
+
                         </div>
                       ))}
                     </div>
