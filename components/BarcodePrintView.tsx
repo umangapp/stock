@@ -213,11 +213,11 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               <Move size={16} className="text-emerald-500"/> 5. แถบปรับขนาดรูป QR Code (ปัจจุบัน: {qrSize}px)
             </h4>
             <input 
-              type="range" min="70" max="200" step="5" 
-              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
+              type="range" min="70" max="500" step="5" 
+              className="w-full h-2 bg-slate-500 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
               value={qrSize} onChange={e => handleQrSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ขยายใหญ่สุด (200px)</span></div>
+            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ขยายใหญ่สุด (500px)</span></div>
           </div>
 
           {/* 🌟 🤖 สวิตช์ปุ่มกดเลือกเลย์เอาท์ป้ายอัจฉริยะ (จำเครื่องอัตโนมัติ) */}
