@@ -34,19 +34,28 @@ const playErrorSound = () => {
   } catch (e) { console.error("Sound play error", e); }
 };
 
-// --- 🎨 แยกสี SKU ---
+// --- 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU ประจำโหมดสแกนต่อเนื่อง (ดักจับ X ใหญ่ + ปลายนิ้วสีเทา Slate สมบูรณ์แบบ) ---
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
+  const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/x+$/);
+  
+  // 🔒 เปลี่ยนมาใช้ /[xX]+$/ เพื่อดักจับทั้ง x เล็ก และ X ตัวใหญ่หน้างาน ไม่ให้ตำแหน่งสีสไลด์เลื่อน
+  const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  const p1 = sku.substring(0, preLen);
-  const p4 = sku.substring(sku.length - paddingLen);
-  const p3 = sku.substring(sku.length - paddingLen - 6, sku.length - paddingLen);
-  const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
+  
+  const p1 = cleanSku.substring(0, preLen);
+  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
+  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
+  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  
   return (
     <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px]">
-      <span className="text-blue-600">{p1}</span><span className="text-green-600">{p2}</span><span className="text-orange-500">{p3}</span><span className="text-cyan-400">{p4}</span>
+      <span className="text-blue-600">{p1}</span>
+      <span className="text-green-600">{p2}</span>
+      <span className="text-orange-500">{p3}</span>
+      {/* 🎨 เปลี่ยนจากสีฟ้าครามเดิม ให้กลายเป็นสีเทา text-slate-400 สวยงามตามสั่งครับพี่ตั้ม */}
+      <span className="text-slate-400">{p4}</span>
     </span>
   );
 };
@@ -87,18 +96,18 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
             const inBasket = basket.find(item => item.sku_15_digits === p.sku_15_digits);
             const currentQty = inBasket ? inBasket.amount : 0;
             if (currentQty + 1 > p.current_stock) { 
-                playErrorSound(); // 🌟 เสียงเตือนสต๊อกพัง
+                playErrorSound(); 
                 alert(`❌ สต๊อกไม่พอจ่าย!\n"${p.name}" เหลือเพียง ${p.current_stock}`); 
                 isScanLocked.current = false; return; 
             }
         }
         
-        playScanSound(); // 🌟 เสียงตี๊ดปกติ
+        playScanSound(); 
         setBasket(prev => {
             const idx = prev.findIndex(item => item.sku_15_digits === p.sku_15_digits);
             if (idx > -1) {
                 const updated = { ...prev[idx], amount: prev[idx].amount + 1 };
-                return [updated, ...prev.filter((_, i) => i !== idx)]; // ดันตัวล่าสุดขึ้นบน
+                return [updated, ...prev.filter((_, i) => i !== idx)]; 
             }
             return [{ ...p, amount: 1 }, ...prev];
         });
@@ -170,7 +179,7 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
           </div>
       </div>
 
-      {/* --- 🌟 หน้าจอสรุปรายการชุด (Batch Summary Modal) 🌟 --- */}
+      {/* --- หน้าจอสรุปรายการชุด (Batch Summary Modal) --- */}
       {showBatchSummary && (
           <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-2xl z-[500] flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-md rounded-[3rem] p-8 flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
