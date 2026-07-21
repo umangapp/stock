@@ -128,13 +128,11 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const printCards = getFlattenedPrintCards()
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku_15_digits.includes(searchQuery.toUpperCase()))
 
-  // 🔒 🤖 คำนวณหาโควตาจำนวนดวงต่อหน้ากระดาษ A4 ตามสูตรคำสั่งล็อกเป้าของพี่ตั้ม
   const itemsPerPage = layoutMode === 'vertical' ? 9 : 15;
 
   return (
     <div className="space-y-8 animate-in fade-in">
       
-      {/* 🔒 🤖 ฝังชุดคำสั่ง CSS Grid ควบคุมเครื่องพิมพ์ของระบบ Windows/Mac ให้สับ Layout หน้าตรงเป๊ะตามสั่ง */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
@@ -330,7 +328,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                 <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight truncate shrink-0" style={{ fontSize: `${fontSize + 2}px`, margin: '0 0 4px 0' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexTemplate: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
                       <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
                       <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {printCards[0].prefix} : {printCards[0].name}</p>
@@ -364,7 +362,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       </div>
 
-      {/* 🔒 🤖 หน้าจอพรีวิวบนแอป ปรับเป็นระบบ CSS Grid 3 คอลัมน์ ล็อกตามการตั้งค่าเป๊ะ ๆ */}
+      {/* หน้าจอพรีวิวบนแอป ปรับเป็นระบบ CSS Grid 3 คอลัมน์ ล็อกตามการตั้งค่าเป๊ะ ๆ */}
       {printCards.length > 0 && (
         <div className="no-print bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-sm">
           <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ 9. ตัวอย่างจัดหน้ากระดาษ A4 ({layoutMode === 'vertical' ? '3x3' : '3x5'} Layout)</h4>
@@ -376,7 +374,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                     <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 3px 0' }} className="truncate">{companyName}</p>
                     
                     {layoutMode === 'vertical' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyTemplate: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
                           <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
