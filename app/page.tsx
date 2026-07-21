@@ -9,7 +9,10 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 🔒 🤖 ดักจับถ้าพนักงานกดลิงก์ Reset Password มาจากอีเมล ให้เตะไปหน้ากรอกรหัสใหม่ทันที
+    // 🌟 🤖 1. เช็กด่วนว่า URL ปัจจุบันเป็นลิงก์กู้รหัสผ่านจากอีเมลหรือไม่ เพื่อเบรกไม่ให้ระบบดีดไปหน้า Login
+    const isRecoveryLink = typeof window !== 'undefined' && window.location.hash.includes('type=recovery');
+
+    // 2. ตั้งตัวฟังสถานะจาก Supabase
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
         router.push('/reset-password')
@@ -18,21 +21,24 @@ export default function LandingPage() {
 
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      
+      // 🔒 ถ้าไม่มี session และไม่ใช่ลิงก์กู้รหัสผ่าน ถึงจะยอมให้ดีดไปหน้า login
+      if (!session && !isRecoveryLink) {
         router.push('/login')
-      } else {
+      } else if (session && !isRecoveryLink) {
         setLoading(false)
       }
+      // หมายเหตุ: ถ้าเป็นลิงก์ Recovery ระบบจะปล่อยเบรกค้างไว้หน้าโหลด เพื่อรอให้สเต็ปที่ 2 ทำงานเตะไปหน้า reset
     }
     checkUser()
 
-    return () => subscription.unsubscribe() // เคลียร์ความจำเมื่อปิดหน้า
+    return () => subscription.unsubscribe()
   }, [router])
 
   if (loading) return (
     <div className="h-screen bg-[#0a0f18] flex flex-col items-center justify-center text-blue-500 font-black italic uppercase tracking-tighter">
       <div className="animate-spin mb-4"><Package size={40}/></div>
-      LOADING SYSTEM...
+      PROCESSING RECOVERY LINK...
     </div>
   )
 
