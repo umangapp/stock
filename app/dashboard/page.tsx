@@ -7,7 +7,8 @@ import * as XLSX from 'xlsx'
 import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
-  ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode 
+  ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
+  Users, CheckCircle2 // 🌟 นำเข้าไอคอนสำหรับหน้าจัดการผู้ใช้งานเพิ่มเติม
 } from 'lucide-react'
 
 const parseExcelDate = (dateVal: any): string => {
@@ -74,6 +75,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([])
   const [masterProducts, setMasterProducts] = useState<any[]>([])
   const [masterUnits, setMasterUnits] = useState<any[]>([])
+  const [userProfiles, setUserProfiles] = useState<any[]>([]) // 🌟 State เก็บรายชื่อพนักงาน
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -97,15 +99,30 @@ export default function AdminDashboard() {
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
     const { data: ver = null } = await supabase.from('settings_app_config').select('*').maybeSingle()
+    const { data: profiles } = await supabase.from('profiles').select('*').order('full_name') // 🌟 ดึงข้อมูลรายชื่อพนักงาน
+    
     if (t) setTransactions(t)
     if (p) setProducts(p)
     if (mp) setMasterProducts(mp)
     if (mu) setMasterUnits(mu)
+    if (profiles) setUserProfiles(profiles) // 🌟 บันทึกลงตัวแปรโปรไฟล์
     if (ver) { setAppVersion(ver.version); setNewVersionInput(ver.version); setScanDelay(ver.scan_delay || 1000); }
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
+
+  // 🌟 ฟังก์ชันเซฟชื่อพนักงานคนใหม่ลงฐานข้อมูลเมื่อพิมพ์แก้หน้าจอ
+  const handleUpdateUserName = async (id: string, newName: string) => {
+    if (!newName.trim()) return;
+    const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', id);
+    if (!error) {
+      alert("✅ อัปเดตข้อมูลชื่อพนักงานสำเร็จเรียบร้อยครับ");
+      fetchData();
+    } else {
+      alert("❌ เกิดข้อผิดพลาด: ไม่สามารถแก้ไขชื่อได้");
+    }
+  }
 
   const updateSettings = async () => {
     const { error } = await supabase.from('settings_app_config').update({ version: newVersionInput, scan_delay: scanDelay }).eq('id', 1)
@@ -240,6 +257,7 @@ export default function AdminDashboard() {
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
             { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
             { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
+            { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users }, // 🌟 เพิ่มปุ่มสลับเมนูหน้าผู้ใช้งาน
             { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
           ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
@@ -311,7 +329,7 @@ export default function AdminDashboard() {
           <BarcodePrintView products={products} />
         )}
 
-        {/* 🌟 TAB: ภาพรวมระบบ (Activity Feed เพิ่มวันที่อัปเดต + ขนาดกับล็อตใหญ่ขึ้น 2 Step เคลียร์เรียบร้อยครับพี่ตั้ม) */}
+        {/* TAB: ภาพรวมระบบ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in no-print">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter">Activity Feed</h2>
@@ -330,9 +348,7 @@ export default function AdminDashboard() {
                             <div className="flex-1">
                                 <p className="text-xl font-black uppercase leading-none">{log.products?.name}</p>
                                 <div className="flex flex-wrap items-center gap-2 mt-2 leading-none">
-                                    {/* 🌟 ขนาดขยายใหญ่ 2 Step จาก 10px ➡️ เป็น 14px หนา คมชัด */}
                                     <p className="text-[14px] font-black text-slate-600 uppercase tracking-tight">ขนาด: {log.products?.height}x{log.products?.width}x{log.products?.length} มม.</p>
-                                    {/* 🌟 ล็อตขยายใหญ่ 2 Step จาก 9px ➡️ เป็น 13px สีเข้มเด่นสะดุดตา */}
                                     <span className="text-[13px] font-black text-slate-800 uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Lot: {log.products?.received_date}</span>
                                 </div>
                             </div>
@@ -340,7 +356,6 @@ export default function AdminDashboard() {
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
                           
-                          {/* 🌟 🤖 เพิ่มแท็บบรรทัดวันที่และเวลาที่อัปเดตล่าสุดของพนักงานแต่ละคนตามบรีฟเป๊ะๆ ครับพี่ตั้ม */}
                           <div className="pt-2.5 mt-0.5 border-t border-slate-100 flex justify-between items-center text-[11px] font-bold text-slate-400">
                             <div className="flex items-center gap-1">
                               <Clock size={12} className="text-slate-400" />
@@ -350,13 +365,59 @@ export default function AdminDashboard() {
                               {log.type === 'receive' ? 'สแกนเข้าคลัง' : 'สแกนจ่ายออก'}
                             </span>
                           </div>
-
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 🌟 TAB: จัดการผู้ใช้งาน (กล่อง UI หน้าเว็บบันทึกแบบ Auto OnBlur / Enter ครบสเปกครับ) */}
+        {activeTab === 'users' && (
+          <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
+            <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">จัดการผู้ใช้งาน (Users)</h2>
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+               <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">รายชื่อพนักงานในระบบ</h4>
+               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {userProfiles.map(user => (
+                    <div key={user.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col gap-4">
+                       <div>
+                         <p className="text-[10px] font-black uppercase text-slate-400 mb-1">รหัสพนักงาน (ID ลับระบบ)</p>
+                         <p className="text-xs font-mono text-slate-500 truncate">{user.id}</p>
+                       </div>
+                       <div>
+                         <label className="text-[10px] font-black uppercase text-blue-600 mb-2 block">ชื่อ-นามสกุล (ที่แสดงผลในแอป)</label>
+                         <div className="flex gap-2">
+                            <input 
+                              type="text" 
+                              className="flex-1 bg-white border p-4 rounded-2xl font-black text-slate-900 outline-none focus:border-blue-500" 
+                              defaultValue={user.full_name} 
+                              onBlur={(e) => {
+                                if (e.target.value !== user.full_name) {
+                                  handleUpdateUserName(user.id, e.target.value)
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.currentTarget.blur();
+                                }
+                              }}
+                            />
+                            <button 
+                              onClick={() => { alert("คุณสามารถพิมพ์แก้ไขที่ช่องชื่อ แล้วคลิกพื้นที่ว่าง หรือกด Enter เพื่อเซฟได้เลยครับ") }}
+                              className="bg-blue-100 text-blue-600 p-4 rounded-2xl shadow-sm hover:bg-blue-200 transition-all"
+                            >
+                              <CheckCircle2 size={20} />
+                            </button>
+                         </div>
+                         <p className="text-[10px] font-bold text-slate-400 mt-2 italic">พิมพ์แก้ชื่อแล้วกด Enter หรือคลิกพื้นที่ว่างเพื่อบันทึกทันที</p>
+                       </div>
+                    </div>
+                  ))}
+               </div>
             </div>
           </div>
         )}
