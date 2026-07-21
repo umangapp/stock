@@ -24,21 +24,16 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [searchQuery, setSearchQuery] = useState('')
   
-  // แผงควบคุมส่วนกลางจำค่าอัตโนมัติ
   const [companyName, setCompanyName] = useState('บริษัท อุมัง จำกัด')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
   const [fontSize, setFontSize] = useState(14) 
-  const [qrSize, setQrSize] = useState(100)     
+  const [qrSize, setQrSize] = useState(100)      
   const [frameWidth, setFrameWidth] = useState(6.7)   
   const [frameHeight, setFrameHeight] = useState(6.7)  
 
-  // สลับรูปแบบเลย์เอาท์ป้าย แนวตั้ง / แนวนอน
   const [layoutMode, setLayoutMode] = useState<'horizontal' | 'vertical'>('vertical')
-
-  // เก็บสถานะตัวเลือกสินค้าแต่ละแถว
   const [itemSettings, setItemSettings] = useState<{[key: string]: { checked: boolean, copies: number, packNo: string, labelAmount: number, showAmount: boolean }}>({})
 
-  // ระบบดักจับดึงข้อมูลล่าสุดจากหน่วยความจำเครื่องคอมพิวเตอร์หน้างาน
   useEffect(() => {
     const savedName = localStorage.getItem('umang_company_name')
     if (savedName) setCompanyName(savedName)
@@ -133,15 +128,54 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const printCards = getFlattenedPrintCards()
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.sku_15_digits.includes(searchQuery.toUpperCase()))
 
+  // 🔒 🤖 คำนวณหาโควตาจำนวนดวงต่อหน้ากระดาษ A4 ตามสูตรคำสั่งล็อกเป้าของพี่ตั้ม
+  const itemsPerPage = layoutMode === 'vertical' ? 9 : 15;
+
   return (
     <div className="space-y-8 animate-in fade-in">
+      
+      {/* 🔒 🤖 ฝังชุดคำสั่ง CSS Grid ควบคุมเครื่องพิมพ์ของระบบ Windows/Mac ให้สับ Layout หน้าตรงเป๊ะตามสั่ง */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          .print-area { display: block !important; width: ${layoutMode === 'vertical' ? '210mm' : '297mm'} !important; }
+          @page {
+            size: A4 ${layoutMode === 'vertical' ? 'portrait' : 'landscape'};
+            margin: 0mm !important;
+          }
+          body {
+            margin: 0mm !important;
+            padding: 0mm !important;
+            background: #ffffff !important;
+          }
+          .sticker-page {
+            display: grid !important;
+            grid-template-columns: repeat(3, 1fr) !important;
+            grid-template-rows: repeat(${layoutMode === 'vertical' ? 3 : 5}, 1fr) !important;
+            gap: 4mm !important;
+            padding: 8mm 6mm !important;
+            width: ${layoutMode === 'vertical' ? '210mm' : '297mm'} !important;
+            height: ${layoutMode === 'vertical' ? '297mm' : '210mm'} !important;
+            page-break-after: always !important;
+            page-break-inside: avoid !important;
+            box-sizing: border-box !important;
+            background-color: #ffffff !important;
+          }
+          .sticker-card-print {
+            width: 100% !important;
+            height: 100% !important;
+            box-sizing: border-box !important;
+            page-break-inside: avoid !important;
+          }
+        }
+      `}</style>
       
       {/* แผงควบคุมตั้งค่าระบบบาร์โค้ด */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 no-print text-slate-800">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สร้างบาร์โค้ดสินค้า</h2>
-            <p className="text-xs text-slate-400 font-bold mt-1">ระบบจัดพิมพ์สติ๊กเกอร์สำเร็จรูปขนาด A4 หน้าละ 12 ดวง สามารถเลือกรูปแบบป้ายแนวตั้ง/แนวนอนได้อิสระ</p>
+            <p className="text-xs text-slate-400 font-bold mt-1">ระบบจัดพิมพ์สติ๊กเกอร์ล็อกความละเอียดตารางจัดวาง (แนวตั้ง 3x3 รวม 9 ดวง / แนวนอน 3x5 รวม 15 ดวงต่อแผ่น)</p>
           </div>
           <button 
             onClick={() => {
@@ -196,11 +230,11 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               <Type size={16} className="text-blue-500"/> 4. แถบปรับขนาดตัวหนังสือ (ปัจจุบัน: {fontSize}px)
             </h4>
             <input 
-              type="range" min="16" max="40" step="1" 
+              type="range" min="12" max="30" step="1" 
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
               value={fontSize} onChange={e => handleFontSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่มาก (24px)</span></div>
+            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่ (30px)</span></div>
           </div>
 
           <div className="space-y-2">
@@ -208,11 +242,11 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               <Move size={16} className="text-emerald-500"/> 5. แถบปรับขนาดรูป QR Code (ปัจจุบัน: {qrSize}px)
             </h4>
             <input 
-              type="range" min="70" max="500" step="5" 
-              className="w-full h-2 bg-slate-500 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
+              type="range" min="70" max="250" step="5" 
+              className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
               value={qrSize} onChange={e => handleQrSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ขยายใหญ่สุด (500px)</span></div>
+            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ใหญ่ (250px)</span></div>
           </div>
 
           <div className="space-y-2">
@@ -223,14 +257,14 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                 onClick={() => handleLayoutModeChange('vertical')}
                 className={`flex items-center justify-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'vertical' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
               >
-                <Rows size={16}/> โหมดแนวตั้ง (QR ล่าง)
+                <Rows size={16}/> แนวตั้ง (3x3 ตาราง)
               </button>
               <button 
                 type="button"
                 onClick={() => handleLayoutModeChange('horizontal')}
                 className={`flex items-center justify-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'horizontal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
               >
-                <Columns size={16}/> โหมดแนวนอน (ซ้าย-ขวา)
+                <Columns size={16}/> แนวนอน (3x5 ตาราง)
               </button>
             </div>
           </div>
@@ -296,9 +330,8 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                 <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight truncate shrink-0" style={{ fontSize: `${fontSize + 2}px`, margin: '0 0 4px 0' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexTemplate: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
-                      {/* 🌟 ปรับระยะห่างบนล่างของ Pack No แล้ว */}
                       <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
                       <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {printCards[0].prefix} : {printCards[0].name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
@@ -331,21 +364,21 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       </div>
 
-      {/* หน้าจอพรีวิวแบบตารางรวม 3x4 บนหน้าเว็บแอปหลัก (no-print) */}
+      {/* 🔒 🤖 หน้าจอพรีวิวบนแอป ปรับเป็นระบบ CSS Grid 3 คอลัมน์ ล็อกตามการตั้งค่าเป๊ะ ๆ */}
       {printCards.length > 0 && (
         <div className="no-print bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-sm">
-          <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ 9. ตัวอย่างจัดหน้ากระดาษ A4 (3x4 Layout)</h4>
+          <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ 9. ตัวอย่างจัดหน้ากระดาษ A4 ({layoutMode === 'vertical' ? '3x3' : '3x5'} Layout)</h4>
           <div className="bg-slate-100 p-4 rounded-3xl overflow-x-auto">
-            <div className="w-[210mm] bg-white border shadow-inner p-[5mm] mx-auto min-h-[297mm]">
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4mm', alignContent: 'flex-start' }}>
+            <div className="bg-white border shadow-inner p-[5mm] mx-auto" style={{ width: layoutMode === 'vertical' ? '210mm' : '297mm', minHeight: layoutMode === 'vertical' ? '297mm' : '210mm' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4mm' }}>
                 {printCards.map((card, idx) => (
-                  <div key={idx} className="border border-slate-300 bg-white text-slate-900 p-3 rounded flex flex-col justify-between overflow-hidden shrink-0" style={{ width: `${frameWidth}cm`, height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
+                  <div key={idx} className="border border-slate-300 bg-white text-slate-900 p-3 rounded flex flex-col justify-between overflow-hidden shadow-sm" style={{ width: '100%', height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
                     <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 3px 0' }} className="truncate">{companyName}</p>
                     
                     {layoutMode === 'vertical' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyTemplate: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
-                          <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                          <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
                           <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                           {card.showAmount && <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
@@ -359,7 +392,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '2mm' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
-                          <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                          <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
                           <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                           {card.showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
@@ -379,19 +412,19 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       )}
 
-      {/* 🔒 🖨️ โครงสร้างแท้สำหรับพิมพ์ลงกระดาษสติกเกอร์ / PDF ตัวจริง */}
+      {/* 🔒 🖨️ โครงสร้างสำหรับพิมพ์ลงกระดาษจริง ปรับใช้ระบบคำนวณแบ่งแผ่นตามโควตาแนวตั้ง (9 ดวง) / แนวนอน (15 ดวง) */}
       <div className="print-area hidden">
-        {Array.from({ length: Math.ceil(printCards.length / 12) }).map((_, pageIdx) => (
-          <div key={pageIdx} className="sticker-page" style={{ display: 'flex', flexWrap: 'wrap', gap: '4mm', alignContent: 'flex-start', padding: '6mm 5mm', width: '210mm', minHeight: '297mm', pageBreakAfter: 'always', boxSizing: 'border-box', backgroundColor: '#ffffff' }}>
-            {printCards.slice(pageIdx * 12, (pageIdx + 1) * 12).map((card, idx) => (
-              <div key={idx} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', boxSizing: 'border-box', pageBreakInside: 'avoid', width: `${frameWidth}cm`, height: `${frameHeight}cm`, backgroundColor: '#ffffff', overflow: 'hidden' }}>
+        {Array.from({ length: Math.ceil(printCards.length / itemsPerPage) }).map((_, pageIdx) => (
+          <div key={pageIdx} className="sticker-page">
+            {printCards.slice(pageIdx * itemsPerPage, (pageIdx + 1) * itemsPerPage).map((card, idx) => (
+              <div key={idx} className="sticker-card-print" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', backgroundColor: '#ffffff', overflow: 'hidden' }}>
                 
                 <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
                   <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', width: '100%' }}>
-                      <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                      <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                       {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
@@ -405,7 +438,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justifyContent: 'center' }}>
-                      <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
+                      <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ตัวย่อ :</span> {card.prefix} : {card.name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                       {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
