@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, Minus, Plus, AlertCircle } from 'lucide-react'
+import { X, Minus, Plus, AlertCircle, Package } from 'lucide-react' // 🌟 นำเข้า Package เพิ่มเติม
 
 const playScanSound = () => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -121,12 +121,23 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
              <div className="bg-white w-full max-w-sm rounded-[3rem] p-8 text-center animate-in zoom-in duration-300">
                 <h2 className="text-xl font-black uppercase italic mb-2 leading-tight">{selectedProduct.name}</h2>
                 <div className="mb-2"><SKUColored sku={selectedProduct.sku_15_digits} prefix={selectedProduct.prefix} /></div>
-                <div className="flex items-center justify-center gap-2 mb-6 text-[10px] font-bold text-slate-400 italic uppercase">
+                <div className="flex items-center justify-center gap-2 mb-4 text-[10px] font-bold text-slate-400 italic uppercase">
                     <span>{selectedProduct.height}x{selectedProduct.width}x{selectedProduct.length} มม.</span>
                     <span className="bg-slate-100 px-2 py-0.5 rounded border">LOT: {selectedProduct.received_date}</span>
                 </div>
 
-                {/* 🌟 🤖 โค้ดปุ่มลัดเวอร์ชันแก้บั๊กเลข 1 เกิน: สั่ง Overwrite ค่าเริ่มต้นทิ้งทันทีหากเป็นเลข 1 */}
+                {/* 🌟 🤖 เพิ่มการแสดงสต๊อกปัจจุบันตามบรีฟเป๊ะๆ ครับพี่ตั้ม (มีไฮไลต์สีกรม/ฟ้า เด่นชัด) */}
+                <div className="bg-blue-50/60 border border-blue-100/40 p-3 rounded-2xl mb-5 flex justify-between items-center px-5">
+                  <div className="flex items-center gap-1.5 text-blue-600">
+                    <Package size={14} className="shrink-0" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">สต๊อกปัจจุบัน</span>
+                  </div>
+                  <span className="font-black text-xl text-slate-800">
+                    {selectedProduct.current_stock} <span className="text-xs font-bold text-slate-400 uppercase">{selectedProduct.unit}</span>
+                  </span>
+                </div>
+
+                {/* ปุ่มลัดเวอร์ชันแก้บั๊กเลข 1 เกิน */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     {[5, 10, 50].map(n => (
                         <button 
@@ -139,7 +150,7 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     ))}
                 </div>
 
-                {/* 🌟 🤖 กล่องตัวเลขเวอร์ชันใหม่: พิมพ์เลขตรงๆ (Key-in) จากคีย์บอร์ดมือถือได้ทันทีครับ */}
+                {/* กล่องตัวเลขเวอร์ชันพิมพ์เลขตรงๆ (Key-in) */}
                 <div className="flex items-center justify-between bg-slate-100 p-2 rounded-[2.5rem] mb-6 border border-slate-200">
                     <button onClick={() => setSingleAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-[1.5rem] shadow-sm flex items-center justify-center active:scale-90 shrink-0"><Minus size={24}/></button>
                     
