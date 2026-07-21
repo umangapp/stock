@@ -7,15 +7,13 @@ import { QrCode, LayoutDashboard, Package, ShieldCheck } from 'lucide-react'
 export default function LandingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState<string | null>(null) // 🌟 State เก็บสิทธิ์การใช้งาน
 
   useEffect(() => {
-    // 🌟 🤖 ทริคสกัดบั๊ก: ตรวจสอบรหัสลับที่ซ่อนอยู่ใน URL (Hash)
     const hash = window.location.hash;
-    
-    // ถ้าพบว่าเป็นลิงก์ Reset Password จากอีเมล ให้บังคับพาไปหน้า reset พร้อมหนีบ hash ตามไปด้วย!
     if (hash && hash.includes('type=recovery')) {
       router.push('/reset-password' + hash);
-      return; // สั่งหยุดการทำงานโค้ดด้านล่างทันที ป้องกันการเด้งไปหน้า Login
+      return;
     }
 
     const checkUser = async () => {
@@ -23,6 +21,16 @@ export default function LandingPage() {
       if (!session) {
         router.push('/login')
       } else {
+        // 🌟 🤖 ดึงข้อมูล role จากตาราง profiles
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (profile) {
+          setUserRole(profile.role) // เก็บค่า role ไว้เช็กตอนแสดงปุ่ม
+        }
         setLoading(false)
       }
     }
@@ -64,15 +72,18 @@ export default function LandingPage() {
             </div>
           </button>
 
-          <button onClick={() => router.push('/dashboard')} className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950">
-            <div className="flex items-center gap-5 text-left">
-              <div className="bg-white/5 p-4 rounded-3xl group-hover:scale-110 transition-transform"><LayoutDashboard size={32} className="text-blue-400" /></div>
-              <div>
-                <p className="text-2xl font-black uppercase italic leading-none">Admin Panel</p>
-                <p className="text-[10px] font-black text-slate-500 mt-2 uppercase tracking-widest leading-none">จัดการสต๊อกและข้อมูล</p>
+          {/* 🌟 🤖 ซ่อนปุ่ม Admin Panel ทิ้งทันที ถ้าสิทธิ์ไม่ใช่ admin */}
+          {userRole === 'admin' && (
+            <button onClick={() => router.push('/dashboard')} className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950">
+              <div className="flex items-center gap-5 text-left">
+                <div className="bg-white/5 p-4 rounded-3xl group-hover:scale-110 transition-transform"><LayoutDashboard size={32} className="text-blue-400" /></div>
+                <div>
+                  <p className="text-2xl font-black uppercase italic leading-none">Admin Panel</p>
+                  <p className="text-[10px] font-black text-slate-500 mt-2 uppercase tracking-widest leading-none">จัดการสต๊อกและข้อมูล</p>
+                </div>
               </div>
-            </div>
-          </button>
+            </button>
+          )}
         </div>
 
         <div className="pt-8 flex flex-col items-center gap-2">
