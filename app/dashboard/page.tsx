@@ -8,7 +8,7 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
   ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
-  Users, CheckCircle2 // 🌟 นำเข้าไอคอนสำหรับหน้าจัดการผู้ใช้งานเพิ่มเติม
+  Users, CheckCircle2, ShieldAlert
 } from 'lucide-react'
 
 const parseExcelDate = (dateVal: any): string => {
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
   const [products, setProducts] = useState<any[]>([])
   const [masterProducts, setMasterProducts] = useState<any[]>([])
   const [masterUnits, setMasterUnits] = useState<any[]>([])
-  const [userProfiles, setUserProfiles] = useState<any[]>([]) // 🌟 State เก็บรายชื่อพนักงาน
+  const [userProfiles, setUserProfiles] = useState<any[]>([]) 
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   
@@ -92,35 +92,63 @@ export default function AdminDashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [newProduct, setNewProduct] = useState({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, sku_15_digits: '' })
 
+  const checkAdminAccess = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      router.push('/login')
+      return false
+    }
+    // 🌟 🤖 ล็อกด่านประตูเหล็ก (Gatekeeper) กันพนักงานสิทธิ์ staff แอบเข้า Admin Panel
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    if (!profile || profile.role !== 'admin') {
+      alert('⚠️ ขออภัยครับ: บัญชีผู้ใช้งานของคุณไม่มีสิทธิ์ในการเข้าถึงหน้าผู้ดูแลระบบ')
+      router.push('/') // ดีดกลับหน้าแรกทันที
+      return false
+    }
+    return true
+  }
+
   const fetchData = async () => {
     setLoading(true)
+    const hasAccess = await checkAdminAccess()
+    if (!hasAccess) return;
+
     const { data: t } = await supabase.from('transactions').select('*, products(*)').order('created_at', { ascending: false })
     const { data: p } = await supabase.from('products').select('*').order('height', { ascending: true }).order('width', { ascending: true }).order('length', { ascending: true })
     const { data: mp } = await supabase.from('settings_product_master').select('*').order('name')
     const { data: mu } = await supabase.from('settings_units').select('*').order('unit')
     const { data: ver = null } = await supabase.from('settings_app_config').select('*').maybeSingle()
-    const { data: profiles } = await supabase.from('profiles').select('*').order('full_name') // 🌟 ดึงข้อมูลรายชื่อพนักงาน
+    const { data: profiles } = await supabase.from('profiles').select('*').order('full_name') 
     
     if (t) setTransactions(t)
     if (p) setProducts(p)
     if (mp) setMasterProducts(mp)
     if (mu) setMasterUnits(mu)
-    if (profiles) setUserProfiles(profiles) // 🌟 บันทึกลงตัวแปรโปรไฟล์
+    if (profiles) setUserProfiles(profiles)
     if (ver) { setAppVersion(ver.version); setNewVersionInput(ver.version); setScanDelay(ver.scan_delay || 1000); }
     setLoading(false)
   }
 
   useEffect(() => { fetchData() }, [])
 
-  // 🌟 ฟังก์ชันเซฟชื่อพนักงานคนใหม่ลงฐานข้อมูลเมื่อพิมพ์แก้หน้าจอ
+  // 🌟 ฟังก์ชันเซฟชื่อพนักงานคนใหม่ลงฐานข้อมูล
   const handleUpdateUserName = async (id: string, newName: string) => {
     if (!newName.trim()) return;
     const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', id);
     if (!error) {
-      alert("✅ อัปเดตข้อมูลชื่อพนักงานสำเร็จเรียบร้อยครับ");
+      alert("✅ อัปเดตข้อมูลชื่อพนักงานสำเร็จ");
+      fetchData();
+    }
+  }
+
+  // 🌟 🤖 ฟังก์ชันสำหรับเปลี่ยน Role (สิทธิ์) ของพนักงานผ่านหน้าเว็บ
+  const handleUpdateUserRole = async (id: string, newRole: string) => {
+    if (!confirm(`⚠️ ยืนยันการเปลี่ยนสิทธิ์ผู้ใช้งานนี้เป็น "${newRole}" หรือไม่?`)) return;
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', id);
+    if (!error) {
       fetchData();
     } else {
-      alert("❌ เกิดข้อผิดพลาด: ไม่สามารถแก้ไขชื่อได้");
+      alert("❌ ไม่สามารถเปลี่ยนสิทธิ์ได้ โปรดลองอีกครั้ง");
     }
   }
 
@@ -222,6 +250,8 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
+  if (loading) return <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">VERIFYING ACCESS...</div>
+
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
       
@@ -257,7 +287,7 @@ export default function AdminDashboard() {
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
             { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
             { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
-            { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users }, // 🌟 เพิ่มปุ่มสลับเมนูหน้าผู้ใช้งาน
+            { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users },
             { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
           ].map((item) => (
             <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
@@ -355,7 +385,6 @@ export default function AdminDashboard() {
                             <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
                           </div>
                           <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
-                          
                           <div className="pt-2.5 mt-0.5 border-t border-slate-100 flex justify-between items-center text-[11px] font-bold text-slate-400">
                             <div className="flex items-center gap-1">
                               <Clock size={12} className="text-slate-400" />
@@ -375,20 +404,35 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 🌟 TAB: จัดการผู้ใช้งาน (กล่อง UI หน้าเว็บบันทึกแบบ Auto OnBlur / Enter ครบสเปกครับ) */}
+        {/* 🌟 TAB: จัดการผู้ใช้งาน (เพิ่มระบบ Dropdown ปรับ Role ให้แอดมินใช้เลย) */}
         {activeTab === 'users' && (
           <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">จัดการผู้ใช้งาน (Users)</h2>
             <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-               <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">รายชื่อพนักงานในระบบ</h4>
+               <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">รายชื่อและสิทธิ์พนักงานในระบบ</h4>
                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {userProfiles.map(user => (
-                    <div key={user.id} className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col gap-4">
-                       <div>
-                         <p className="text-[10px] font-black uppercase text-slate-400 mb-1">รหัสพนักงาน (ID ลับระบบ)</p>
-                         <p className="text-xs font-mono text-slate-500 truncate">{user.id}</p>
+                    <div key={user.id} className={`p-6 rounded-[2rem] border shadow-sm flex flex-col gap-4 transition-all ${user.role === 'admin' ? 'bg-amber-50/50 border-amber-200' : 'bg-slate-50 border-slate-100'}`}>
+                       <div className="flex justify-between items-start">
+                         <div>
+                           <p className="text-[10px] font-black uppercase text-slate-400 mb-1">รหัสพนักงาน (ID ลับ)</p>
+                           <p className="text-xs font-mono text-slate-500 truncate w-48 sm:w-auto">{user.id}</p>
+                         </div>
+                         {/* 🌟 🤖 กล่อง Dropdown ปรับสิทธิ์ Role (Admin/Staff) */}
+                         <div className="flex flex-col items-end">
+                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1">สิทธิ์ (Role)</label>
+                            <select 
+                              className={`text-xs font-black uppercase p-2 rounded-xl outline-none shadow-sm cursor-pointer border ${user.role === 'admin' ? 'bg-amber-500 text-white border-amber-600' : 'bg-slate-200 text-slate-600 border-slate-300'}`}
+                              value={user.role || 'staff'}
+                              onChange={(e) => handleUpdateUserRole(user.id, e.target.value)}
+                            >
+                              <option value="admin">ADMIN (แอดมิน)</option>
+                              <option value="staff">STAFF (สแกนเท่านั้น)</option>
+                            </select>
+                         </div>
                        </div>
-                       <div>
+                       
+                       <div className="border-t border-slate-200/50 pt-4 mt-2">
                          <label className="text-[10px] font-black uppercase text-blue-600 mb-2 block">ชื่อ-นามสกุล (ที่แสดงผลในแอป)</label>
                          <div className="flex gap-2">
                             <input 
