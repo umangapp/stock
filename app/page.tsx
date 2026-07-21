@@ -9,6 +9,13 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // 🔒 🤖 ดักจับถ้าพนักงานกดลิงก์ Reset Password มาจากอีเมล ให้เตะไปหน้ากรอกรหัสใหม่ทันที
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        router.push('/reset-password')
+      }
+    })
+
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -18,6 +25,8 @@ export default function LandingPage() {
       }
     }
     checkUser()
+
+    return () => subscription.unsubscribe() // เคลียร์ความจำเมื่อปิดหน้า
   }, [router])
 
   if (loading) return (
@@ -45,8 +54,6 @@ export default function LandingPage() {
 
         {/* NAVIGATION BUTTONS */}
         <div className="grid grid-cols-1 gap-4">
-          
-          {/* ปุ่มไปหน้า Scan */}
           <button
             onClick={() => router.push('/scan')}
             className="group bg-blue-600 hover:bg-blue-500 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 shadow-xl border-b-8 border-blue-800"
@@ -62,7 +69,6 @@ export default function LandingPage() {
             </div>
           </button>
 
-          {/* ปุ่มไปหน้า Dashboard */}
           <button
             onClick={() => router.push('/dashboard')}
             className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950"
@@ -77,7 +83,6 @@ export default function LandingPage() {
               </div>
             </div>
           </button>
-
         </div>
 
         {/* FOOTER INFO */}
