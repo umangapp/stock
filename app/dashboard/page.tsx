@@ -8,7 +8,7 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
   ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
-  Users, CheckCircle2, Home // 🌟 นำเข้าไอคอน Home สำหรับกลับหน้าหลัก
+  Users, CheckCircle2, Home
 } from 'lucide-react'
 
 const parseExcelDate = (dateVal: any): string => {
@@ -274,21 +274,38 @@ export default function AdminDashboard() {
 
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
       
-      <nav className="w-full lg:w-72 bg-slate-900 text-white p-6 flex lg:flex-col gap-2 shrink-0 z-20 shadow-2xl no-print">
-        <div className="mb-6">
-            <h1 className="text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
+      <nav className="w-full lg:w-72 bg-slate-900 text-white p-4 lg:p-6 flex flex-col gap-4 shrink-0 z-20 shadow-2xl no-print">
+        
+        {/* 🌟 🤖 ส่วนหัวของเมนู (จัดเรียงปุ่ม Home และ Logout แบบ Icon เพียวๆ ให้สู้กับจอมือถือ) */}
+        <div className="flex justify-between items-start lg:flex-col lg:gap-6">
+          <div className="mb-2 lg:mb-0">
+              <h1 className="text-xl lg:text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => router.push('/')} 
+              className="p-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl transition-all active:scale-95 shadow-sm"
+              title="กลับหน้าเมนูหลัก"
+            >
+              <Home size={22} />
+            </button>
+            <button 
+              onClick={() => {
+                if(confirm("ยืนยันการออกจากระบบ?")) {
+                  supabase.auth.signOut().then(() => router.push('/login'))
+                }
+              }} 
+              className="p-3 bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-900/30 rounded-2xl transition-all active:scale-95 shadow-sm"
+              title="ออกจากระบบ"
+            >
+              <LogOut size={22} />
+            </button>
+          </div>
         </div>
 
-        {/* 🌟 🤖 ปุ่มกดกลับหน้าเมนูหลัก (ตามบรีฟข้อ 2 ของ Admin: ให้มีปุ่มกดออกไปเมนูหลัก) */}
-        <button 
-          onClick={() => router.push('/')} 
-          className="flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-black uppercase bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 mb-4 transition-all active:scale-95"
-        >
-          <Home size={20} /> กลับหน้าเมนูหลัก
-        </button>
-
-        <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
+        <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto pb-2 lg:pb-0">
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
             { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
@@ -296,12 +313,11 @@ export default function AdminDashboard() {
             { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users },
             { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
           ].map((item) => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
-              <item.icon size={20} /> {item.label}
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-5 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
+              <item.icon size={20} /> <span className="whitespace-nowrap">{item.label}</span>
             </button>
           ))}
         </div>
-        <button onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} className="flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-bold text-red-400 mt-auto"><LogOut size={20}/> ออกจากระบบ</button>
       </nav>
 
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
