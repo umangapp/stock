@@ -9,36 +9,30 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 🌟 🤖 1. เช็กด่วนว่า URL ปัจจุบันเป็นลิงก์กู้รหัสผ่านจากอีเมลหรือไม่ เพื่อเบรกไม่ให้ระบบดีดไปหน้า Login
-    const isRecoveryLink = typeof window !== 'undefined' && window.location.hash.includes('type=recovery');
-
-    // 2. ตั้งตัวฟังสถานะจาก Supabase
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        router.push('/reset-password')
-      }
-    })
+    // 🌟 🤖 ทริคสกัดบั๊ก: ตรวจสอบรหัสลับที่ซ่อนอยู่ใน URL (Hash)
+    const hash = window.location.hash;
+    
+    // ถ้าพบว่าเป็นลิงก์ Reset Password จากอีเมล ให้บังคับพาไปหน้า reset พร้อมหนีบ hash ตามไปด้วย!
+    if (hash && hash.includes('type=recovery')) {
+      router.push('/reset-password' + hash);
+      return; // สั่งหยุดการทำงานโค้ดด้านล่างทันที ป้องกันการเด้งไปหน้า Login
+    }
 
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      
-      // 🔒 ถ้าไม่มี session และไม่ใช่ลิงก์กู้รหัสผ่าน ถึงจะยอมให้ดีดไปหน้า login
-      if (!session && !isRecoveryLink) {
+      if (!session) {
         router.push('/login')
-      } else if (session && !isRecoveryLink) {
+      } else {
         setLoading(false)
       }
-      // หมายเหตุ: ถ้าเป็นลิงก์ Recovery ระบบจะปล่อยเบรกค้างไว้หน้าโหลด เพื่อรอให้สเต็ปที่ 2 ทำงานเตะไปหน้า reset
     }
     checkUser()
-
-    return () => subscription.unsubscribe()
   }, [router])
 
   if (loading) return (
     <div className="h-screen bg-[#0a0f18] flex flex-col items-center justify-center text-blue-500 font-black italic uppercase tracking-tighter">
       <div className="animate-spin mb-4"><Package size={40}/></div>
-      PROCESSING RECOVERY LINK...
+      LOADING SYSTEM...
     </div>
   )
 
@@ -60,14 +54,9 @@ export default function LandingPage() {
 
         {/* NAVIGATION BUTTONS */}
         <div className="grid grid-cols-1 gap-4">
-          <button
-            onClick={() => router.push('/scan')}
-            className="group bg-blue-600 hover:bg-blue-500 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 shadow-xl border-b-8 border-blue-800"
-          >
+          <button onClick={() => router.push('/scan')} className="group bg-blue-600 hover:bg-blue-500 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 shadow-xl border-b-8 border-blue-800">
             <div className="flex items-center gap-5 text-left">
-              <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-12 transition-transform">
-                <QrCode size={32} />
-              </div>
+              <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-12 transition-transform"><QrCode size={32} /></div>
               <div>
                 <p className="text-2xl font-black uppercase italic leading-none">Scan Center</p>
                 <p className="text-[10px] font-black text-blue-200 mt-2 uppercase tracking-widest leading-none">สแกนรับ-จ่ายสินค้า</p>
@@ -75,14 +64,9 @@ export default function LandingPage() {
             </div>
           </button>
 
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950"
-          >
+          <button onClick={() => router.push('/dashboard')} className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950">
             <div className="flex items-center gap-5 text-left">
-              <div className="bg-white/5 p-4 rounded-3xl group-hover:scale-110 transition-transform">
-                <LayoutDashboard size={32} className="text-blue-400" />
-              </div>
+              <div className="bg-white/5 p-4 rounded-3xl group-hover:scale-110 transition-transform"><LayoutDashboard size={32} className="text-blue-400" /></div>
               <div>
                 <p className="text-2xl font-black uppercase italic leading-none">Admin Panel</p>
                 <p className="text-[10px] font-black text-slate-500 mt-2 uppercase tracking-widest leading-none">จัดการสต๊อกและข้อมูล</p>
@@ -91,7 +75,6 @@ export default function LandingPage() {
           </button>
         </div>
 
-        {/* FOOTER INFO */}
         <div className="pt-8 flex flex-col items-center gap-2">
            <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-full border border-white/5">
               <ShieldCheck size={14} className="text-green-500"/>
