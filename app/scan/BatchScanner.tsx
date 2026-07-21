@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, Zap, AlertCircle } from 'lucide-react'
+import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, Zap, AlertCircle, Package } from 'lucide-react'
 
 // --- 🔊 ฟังก์ชันเสียงสแกนติด (Industrial Beep) ---
 const playScanSound = () => {
@@ -34,13 +34,12 @@ const playErrorSound = () => {
   } catch (e) { console.error("Sound play error", e); }
 };
 
-// --- 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU ประจำโหมดสแกนต่อเนื่อง (ดักจับ X ใหญ่ + ปลายนิ้วสีเทา Slate สมบูรณ์แบบ) ---
+// --- 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU ประจำโหมดสแกนต่อเนื่อง ---
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
   
-  // 🔒 เปลี่ยนมาใช้ /[xX]+$/ เพื่อดักจับทั้ง x เล็ก และ X ตัวใหญ่หน้างาน ไม่ให้ตำแหน่งสีสไลด์เลื่อน
   const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
   
@@ -54,7 +53,6 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
       <span className="text-blue-600">{p1}</span>
       <span className="text-green-600">{p2}</span>
       <span className="text-orange-500">{p3}</span>
-      {/* 🎨 เปลี่ยนจากสีฟ้าครามเดิม ให้กลายเป็นสีเทา text-slate-400 สวยงามตามสั่งครับพี่ตั้ม */}
       <span className="text-slate-400">{p4}</span>
     </span>
   );
@@ -128,6 +126,24 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
     } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); } finally { setIsSaving(false); }
   }
 
+  // 🌟 🤖 ฟังก์ชันอัปเดตจำนวนจากช่องกรอก Key-in
+  const handleAmountChange = (id: string, newAmount: number) => {
+    const validAmount = Math.max(1, newAmount || 1); // บังคับห้ามต่ำกว่า 1
+    
+    setBasket(prev => prev.map(item => {
+      if (item.id === id) {
+        // ถ้าเป็นโหมดเบิกออก ต้องเช็กสต๊อกไม่ให้กรอกเกิน
+        if (scanMode === 'issue' && validAmount > item.current_stock) {
+          playErrorSound();
+          alert(`❌ สต๊อกไม่พอจ่าย! (คงเหลือ: ${item.current_stock})`);
+          return { ...item, amount: item.current_stock };
+        }
+        return { ...item, amount: validAmount };
+      }
+      return item;
+    }));
+  }
+
   return (
     <div className="flex flex-col h-[100dvh] bg-black overflow-hidden font-sans">
       <div className="h-[300px] w-full relative bg-black shrink-0 border-b border-white/10 overflow-hidden">
@@ -150,30 +166,58 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
           </div>
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {basket.map((item, index) => (
-                <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex justify-between items-center shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
-                   <div className="flex-1 pr-4">
-                      <div className="flex items-center gap-2 mb-1 leading-none">
-                        {index === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded italic animate-pulse">LATEST</span>}
-                        <p className="font-black uppercase text-sm leading-none">{item.name}</p>
+                <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex flex-col shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
+                   
+                   {/* แถวบน: ข้อมูลสินค้า */}
+                   <div className="flex justify-between items-start mb-4">
+                     <div className="flex-1 pr-4">
+                        <div className="flex items-center gap-2 mb-1 leading-none">
+                          {index === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded italic animate-pulse">LATEST</span>}
+                          <p className="font-black uppercase text-sm leading-none">{item.name}</p>
+                        </div>
+                        <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
+                        <div className="flex items-center gap-2 mt-1.5 leading-none text-[10px] font-bold text-slate-400 italic">
+                           <span>{item.height}x{item.width}x{item.length} มม.</span>
+                           <span className="bg-slate-100 px-1.5 py-0.5 rounded border font-black text-slate-500 uppercase">LOT: {item.received_date}</span>
+                        </div>
+                     </div>
+                     <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
+                   </div>
+
+                   {/* 🌟 🤖 แถวล่าง: โชว์สต๊อกปัจจุบัน + ตัวควบคุมจำนวนแบบ Input */}
+                   <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                      
+                      {/* ข้อมูลสต๊อกเดิม */}
+                      <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
+                        <Package size={12} className="shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest leading-none">Stock: {item.current_stock}</span>
                       </div>
-                      <SKUColored sku={item.sku_15_digits} prefix={item.prefix} />
-                      <div className="flex items-center gap-2 mt-1.5 leading-none text-[10px] font-bold text-slate-400 italic">
-                         <span>{item.height}x{item.width}x{item.length} มม.</span>
-                         <span className="bg-slate-100 px-1.5 py-0.5 rounded border font-black text-slate-500 uppercase">LOT: {item.received_date}</span>
+
+                      {/* ตัวคุมจำนวน (เปลี่ยนตรงกลางเป็น Input Field) */}
+                      <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-2 border border-slate-200">
+                         <button onClick={() => handleAmountChange(item.id, item.amount - 1)} className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm active:scale-90 transition-all"><Minus size={16}/></button>
+                         
+                         {/* 🌟 🤖 กล่อง Input กรอกมือ */}
+                         <input 
+                           type="number" 
+                           min="1"
+                           className="font-black text-slate-900 text-lg w-12 text-center leading-none bg-transparent outline-none focus:ring-0 focus:border-b-2 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                           value={item.amount || ''}
+                           onChange={(e) => {
+                             const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                             handleAmountChange(item.id, val);
+                           }}
+                           onBlur={(e) => {
+                             if (!e.target.value || parseInt(e.target.value) < 1) {
+                               handleAmountChange(item.id, 1);
+                             }
+                           }}
+                         />
+
+                         <button onClick={() => handleAmountChange(item.id, item.amount + 1)} className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm active:scale-90 transition-all"><Plus size={16}/></button>
                       </div>
                    </div>
-                   <div className="flex items-center gap-2">
-                      <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-3 border border-slate-200">
-                         <button onClick={() => setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: Math.max(1, i.amount-1)} : i))} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm active:scale-90 transition-all"><Minus size={18}/></button>
-                         <span className="font-black text-slate-900 text-lg w-6 text-center leading-none">{item.amount}</span>
-                         <button onClick={() => {
-                             const newQty = item.amount + 1;
-                             if (scanMode === 'issue' && newQty > item.current_stock) { playErrorSound(); alert("สต๊อกไม่พอจ่าย!"); return; }
-                             setBasket(prev => prev.map(i => i.id === item.id ? {...i, amount: newQty} : i))
-                         }} className="w-9 h-9 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm active:scale-90 transition-all"><Plus size={18}/></button>
-                      </div>
-                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
-                   </div>
+
                 </div>
              ))}
           </div>
