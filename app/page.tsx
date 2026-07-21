@@ -2,12 +2,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import { QrCode, LayoutDashboard, Package, ShieldCheck } from 'lucide-react'
+import { QrCode, LayoutDashboard, Package, ShieldCheck, LogOut } from 'lucide-react' // 🌟 นำเข้า LogOut เพิ่มเติม
 
 export default function LandingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [userRole, setUserRole] = useState<string | null>(null) // 🌟 State เก็บสิทธิ์การใช้งาน
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -21,7 +21,6 @@ export default function LandingPage() {
       if (!session) {
         router.push('/login')
       } else {
-        // 🌟 🤖 ดึงข้อมูล role จากตาราง profiles
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
@@ -29,9 +28,9 @@ export default function LandingPage() {
           .single()
         
         if (profile) {
-          setUserRole(profile.role) // เก็บค่า role ไว้เช็กตอนแสดงปุ่ม
+          setUserRole(profile.role)
         }
-        setLoading(false)
+        setLoading(false) // 🌟 โหลดเสร็จแล้วให้อยู่ที่หน้าเมนูหลักนี้เลย ไม่ดีดไปไหน (ตามบรีฟข้อ 1 ของ Admin)
       }
     }
     checkUser()
@@ -62,6 +61,7 @@ export default function LandingPage() {
 
         {/* NAVIGATION BUTTONS */}
         <div className="grid grid-cols-1 gap-4">
+          {/* ปุ่มเข้าหน้าสแกน (แสดงทั้ง Admin และ Staff) */}
           <button onClick={() => router.push('/scan')} className="group bg-blue-600 hover:bg-blue-500 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 shadow-xl border-b-8 border-blue-800">
             <div className="flex items-center gap-5 text-left">
               <div className="bg-white/20 p-4 rounded-3xl group-hover:rotate-12 transition-transform"><QrCode size={32} /></div>
@@ -72,7 +72,7 @@ export default function LandingPage() {
             </div>
           </button>
 
-          {/* 🌟 🤖 ซ่อนปุ่ม Admin Panel ทิ้งทันที ถ้าสิทธิ์ไม่ใช่ admin */}
+          {/* ปุ่มเข้าหน้าแอดมิน (แสดงเฉพาะสิทธิ์ admin เท่านั้น) */}
           {userRole === 'admin' && (
             <button onClick={() => router.push('/dashboard')} className="group bg-slate-800 hover:bg-slate-700 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-slate-950">
               <div className="flex items-center gap-5 text-left">
@@ -84,6 +84,20 @@ export default function LandingPage() {
               </div>
             </button>
           )}
+
+          {/* 🌟 🤖 ปุ่มออกจากระบบ (สำหรับ Staff และ Admin เพื่อความปลอดภัยตามบรีฟข้อที่ 1 ของ Staff) */}
+          <button 
+            onClick={() => supabase.auth.signOut().then(() => router.push('/login'))} 
+            className="group bg-red-950/30 hover:bg-red-900/40 p-6 rounded-[2.5rem] flex items-center justify-between transition-all active:scale-95 border-b-8 border-red-950/80 text-red-400"
+          >
+            <div className="flex items-center gap-5 text-left">
+              <div className="bg-red-500/10 p-4 rounded-3xl group-hover:scale-90 transition-transform"><LogOut size={32} /></div>
+              <div>
+                <p className="text-2xl font-black uppercase italic leading-none">Log Out</p>
+                <p className="text-[10px] font-black text-red-500/70 mt-2 uppercase tracking-widest leading-none">ออกจากระบบพนักงาน</p>
+              </div>
+            </div>
+          </button>
         </div>
 
         <div className="pt-8 flex flex-col items-center gap-2">
