@@ -2,7 +2,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation' 
-import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info } from 'lucide-react'
+// 🌟 🤖 นำเข้าไอคอน Home และ LogOut เพิ่มเติมเรียบร้อยครับ
+import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info, Home, LogOut } from 'lucide-react'
 import SingleScanner from './SingleScanner'
 import BatchScanner from './BatchScanner'
 
@@ -75,12 +76,46 @@ export default function ScanPage() {
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
-      <header className="px-6 py-5 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-50">
+      
+      {/* 🔒 🤖 แถบหัวบนแบบโมเดิร์น ล็อกพื้นที่ให้พอดีจอมือถือ ปุ่มแอกชันฝั่งขวาใช้ระบบ Icon เพียวๆ ไม่ตกบรรทัดครับ */}
+      <header className="px-4 py-4 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-50 shrink-0">
         <div>
           <h1 className="text-xs font-black uppercase italic text-blue-400 leading-none">Scan Center</h1>
           <p className="text-[8px] font-black text-slate-500 uppercase mt-1">Version {appVersion}</p>
         </div>
-        <button onClick={() => { fetchData(); setShowHistory(true); }} className="bg-blue-600 px-5 py-2.5 rounded-full text-[11px] font-black uppercase shadow-lg">ประวัติรายการ</button>
+        
+        {/* รวมกลุ่มปุ่มควบคุมฝั่งขวา */}
+        <div className="flex items-center gap-2">
+          {/* ปุ่มประวัติรายการแบบย่อ ขนาดกระทัดรัดสำหรับมือถือ */}
+          <button 
+            onClick={() => { fetchData(); setShowHistory(true); }} 
+            className="bg-blue-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg whitespace-nowrap active:scale-95 transition-all"
+          >
+            ประวัติ
+          </button>
+          
+          {/* 🏠 ปุ่มกลับหน้าเมนูหลัก: โชว์แค่รูปบ้านสีเหลืองล้วนๆ ไม่มีตัวอักษรกวนใจ */}
+          <button 
+            onClick={() => router.push('/')} 
+            className="p-2 bg-slate-800 text-amber-400 border border-slate-700/60 rounded-xl active:scale-95 transition-all shadow-md"
+            title="กลับหน้าเมนูหลัก"
+          >
+            <Home size={18} />
+          </button>
+          
+          {/* 🚪 ปุ่มออกจากระบบ: โชว์แค่รูปไอคอนล็อกเอาท์สีแดงล้วนๆ สั่งงานได้ทันที */}
+          <button 
+            onClick={() => {
+              if(confirm("🔒 ยืนยันการออกจากระบบพนักงานหรือไม่?")) {
+                supabase.auth.signOut().then(() => router.push('/login'))
+              }
+            }} 
+            className="p-2 bg-red-950/40 text-red-400 border border-red-900/30 rounded-xl active:scale-95 transition-all shadow-md"
+            title="ออกจากระบบ"
+          >
+            <LogOut size={18} />
+          </button>
+        </div>
       </header>
 
       <main className="flex-1 p-6 flex flex-col gap-8 justify-center max-w-sm mx-auto w-full animate-in fade-in">
