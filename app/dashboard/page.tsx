@@ -8,7 +8,7 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
   ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
-  Users, CheckCircle2, ShieldAlert
+  Users, CheckCircle2, Home // 🌟 นำเข้าไอคอน Home สำหรับกลับหน้าหลัก
 } from 'lucide-react'
 
 const parseExcelDate = (dateVal: any): string => {
@@ -98,11 +98,10 @@ export default function AdminDashboard() {
       router.push('/login')
       return false
     }
-    // 🌟 🤖 ล็อกด่านประตูเหล็ก (Gatekeeper) กันพนักงานสิทธิ์ staff แอบเข้า Admin Panel
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
     if (!profile || profile.role !== 'admin') {
       alert('⚠️ ขออภัยครับ: บัญชีผู้ใช้งานของคุณไม่มีสิทธิ์ในการเข้าถึงหน้าผู้ดูแลระบบ')
-      router.push('/') // ดีดกลับหน้าแรกทันที
+      router.push('/')
       return false
     }
     return true
@@ -131,7 +130,6 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData() }, [])
 
-  // 🌟 ฟังก์ชันเซฟชื่อพนักงานคนใหม่ลงฐานข้อมูล
   const handleUpdateUserName = async (id: string, newName: string) => {
     if (!newName.trim()) return;
     const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', id);
@@ -141,7 +139,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🌟 🤖 ฟังก์ชันสำหรับเปลี่ยน Role (สิทธิ์) ของพนักงานผ่านหน้าเว็บ
   const handleUpdateUserRole = async (id: string, newRole: string) => {
     if (!confirm(`⚠️ ยืนยันการเปลี่ยนสิทธิ์ผู้ใช้งานนี้เป็น "${newRole}" หรือไม่?`)) return;
     const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', id);
@@ -278,10 +275,19 @@ export default function AdminDashboard() {
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
       
       <nav className="w-full lg:w-72 bg-slate-900 text-white p-6 flex lg:flex-col gap-2 shrink-0 z-20 shadow-2xl no-print">
-        <div className="mb-10">
+        <div className="mb-6">
             <h1 className="text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
         </div>
+
+        {/* 🌟 🤖 ปุ่มกดกลับหน้าเมนูหลัก (ตามบรีฟข้อ 2 ของ Admin: ให้มีปุ่มกดออกไปเมนูหลัก) */}
+        <button 
+          onClick={() => router.push('/')} 
+          className="flex items-center gap-4 px-6 py-4 rounded-3xl text-sm font-black uppercase bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 mb-4 transition-all active:scale-95"
+        >
+          <Home size={20} /> กลับหน้าเมนูหลัก
+        </button>
+
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto">
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
@@ -404,7 +410,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* 🌟 TAB: จัดการผู้ใช้งาน (เพิ่มระบบ Dropdown ปรับ Role ให้แอดมินใช้เลย) */}
+        {/* TAB: จัดการผู้ใช้งาน */}
         {activeTab === 'users' && (
           <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
             <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">จัดการผู้ใช้งาน (Users)</h2>
@@ -418,7 +424,6 @@ export default function AdminDashboard() {
                            <p className="text-[10px] font-black uppercase text-slate-400 mb-1">รหัสพนักงาน (ID ลับ)</p>
                            <p className="text-xs font-mono text-slate-500 truncate w-48 sm:w-auto">{user.id}</p>
                          </div>
-                         {/* 🌟 🤖 กล่อง Dropdown ปรับสิทธิ์ Role (Admin/Staff) */}
                          <div className="flex flex-col items-end">
                             <label className="text-[9px] font-black uppercase text-slate-400 mb-1">สิทธิ์ (Role)</label>
                             <select 
