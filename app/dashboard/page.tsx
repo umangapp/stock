@@ -58,7 +58,7 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
   const p2 = sku.substring(preLen, sku.length - paddingLen - 6);
   const colors = isDark ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", pad: "text-slate-500" } : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", pad: "text-slate-400" };
   return (
-    <span className="font-mono font-black tracking-widest uppercase italic">
+    <span className="font-mono font-black tracking-widest uppercase italic tracking-normal">
       <span className={colors.pre}>{p1}</span>
       <span className={colors.dim}>{p2}</span>
       <span className={colors.lot}>{p3}</span>
@@ -275,8 +275,6 @@ export default function AdminDashboard() {
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
       
       <nav className="w-full lg:w-72 bg-slate-900 text-white p-4 lg:p-6 flex flex-col gap-4 shrink-0 z-20 shadow-2xl no-print">
-        
-        {/* 🌟 🤖 ส่วนหัวของเมนู (จัดเรียงปุ่ม Home และ Logout แบบ Icon เพียวๆ ให้สู้กับจอมือถือ) */}
         <div className="flex justify-between items-start lg:flex-col lg:gap-6">
           <div className="mb-2 lg:mb-0">
               <h1 className="text-xl lg:text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
@@ -284,24 +282,8 @@ export default function AdminDashboard() {
           </div>
           
           <div className="flex items-center gap-2">
-            <button 
-              onClick={() => router.push('/')} 
-              className="p-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl transition-all active:scale-95 shadow-sm"
-              title="กลับหน้าเมนูหลัก"
-            >
-              <Home size={22} />
-            </button>
-            <button 
-              onClick={() => {
-                if(confirm("ยืนยันการออกจากระบบ?")) {
-                  supabase.auth.signOut().then(() => router.push('/login'))
-                }
-              }} 
-              className="p-3 bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-900/30 rounded-2xl transition-all active:scale-95 shadow-sm"
-              title="ออกจากระบบ"
-            >
-              <LogOut size={22} />
-            </button>
+            <button onClick={() => router.push('/')} className="p-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl transition-all active:scale-95 shadow-sm" title="กลับหน้าเมนูหลัก"><Home size={22} /></button>
+            <button onClick={() => { if(confirm("ยืนยันการออกจากระบบ?")) { supabase.auth.signOut().then(() => router.push('/login')) } }} className="p-3 bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-900/30 rounded-2xl transition-all active:scale-95 shadow-sm" title="ออกจากระบบ"><LogOut size={22} /></button>
           </div>
         </div>
 
@@ -546,18 +528,55 @@ export default function AdminDashboard() {
                     {masterProducts.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                   </select>
                 </div>
+                
+                {/* 🌟 🤖 จุดแก้ไขข้อที่ 1: เพิ่มพิกัดนับ Digit รหัส SKU ด้านล่างแบบตัวอักษรสีแดงตามบรีฟเป๊ะๆ ครับ */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
                   <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ล็อกสเปก 15 หลักพอดีเป๊ะ)</label>
                   <input type="text" required maxLength={15} className="w-full bg-white/5 border border-white/10 p-4 rounded-2xl font-mono font-black text-2xl uppercase tracking-widest text-center text-emerald-400 outline-none" placeholder="พิมพ์รหัส 15 หลัก..." value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} onChange={e => { const val = e.target.value.replace(/\s+/g, '').toUpperCase(); if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); else setEditingProduct({...editingProduct, sku_15_digits: val}); }} />
+                  
+                  <p className="text-red-500 text-xs font-black uppercase tracking-wider mt-2.5 text-center animate-pulse">
+                    คีย์ลงไปแล้ว: {(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits || '').length} / 15 หลัก
+                  </p>
                 </div>
+                
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อประเภท</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หนา (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">กว้าง (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ยาว (mm)</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center" placeholder="เช่น 27/11/2025" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
                 <div><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
-                <div className="bg-blue-50 rounded-2xl p-4"><label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label><input type="number" required className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" value={isAddModalOpen ? newProduct.current_stock : editingProduct.current_stock} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, current_stock: Number(e.target.value)}) : setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} /></div>
+                
+                {/* 🌟 🤖 จุดแก้ไขข้อที่ 2: ปรับระบบสต๊อกเริ่มต้น ให้เลข 0 สลายหายไปเมื่อมีการกดแตะ (Focus) เพื่อเตรียมคีย์เลขใหม่ */}
+                <div className="bg-blue-50 rounded-2xl p-4">
+                  <label className="text-[10px] font-black uppercase text-blue-400 block mb-1">สต๊อกเริ่มต้น</label>
+                  <input 
+                    type="number" 
+                    required 
+                    className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" 
+                    value={isAddModalOpen ? (newProduct.current_stock === 0 && (newProduct as any)._isFocused ? '' : newProduct.current_stock) : (editingProduct.current_stock === 0 && (editingProduct as any)._isFocused ? '' : editingProduct.current_stock)} 
+                    onChange={e => {
+                      const val = e.target.value === '' ? 0 : Number(e.target.value);
+                      if (isAddModalOpen) setNewProduct({...newProduct, current_stock: val});
+                      else setEditingProduct({...editingProduct, current_stock: val});
+                    }}
+                    onFocus={() => {
+                      if (isAddModalOpen) {
+                        setNewProduct({ ...newProduct, _isFocused: true } as any);
+                      } else {
+                        setEditingProduct({ ...editingProduct, _isFocused: true } as any);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (isAddModalOpen) {
+                        setNewProduct({ ...newProduct, _isFocused: false } as any);
+                      } else {
+                        setEditingProduct({ ...editingProduct, _isFocused: false } as any);
+                      }
+                    }}
+                  />
+                </div>
               </div>
+              
               <button type="submit" disabled={((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length !== 15} className={`w-full py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl transition-all ${((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'bg-blue-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                 {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 15 ? 'บันทึกข้อมูลสินค้า' : '❌ กรุณากรอก SKU ให้ครบ 15 หลัก'}
               </button>
