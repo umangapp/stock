@@ -240,7 +240,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
           const formattedDate = parseExcelDate(row[3]);
-          const manualSku = String(row[6] || '').trim().toUpperCase();
+          const manualSku = String(row[7] || '').trim().toUpperCase(); // ขยับเป็น row[7] (คอลัมน์ H)
           
           if (manualSku.length < 8) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
@@ -284,10 +284,10 @@ export default function AdminDashboard() {
             width: wVal ? parseFloat(wVal) : 0, 
             length: lVal ? parseFloat(lVal) : 0, 
             received_date: formattedDate, 
-            unit: String(row[4] || '').trim(), 
-            current_stock: Number(row[5] || 0), 
+            unit: String(row[5] || '').trim(), // ขยับเป็น row[5] (คอลัมน์ F)
+            current_stock: Number(row[6] || 0), // ขยับเป็น row[6] (คอลัมน์ G)
             sku_15_digits: manualSku,
-            safety_stock: Number(row[7] || 0) 
+            safety_stock: Number(row[8] || 0) // ขยับเป็น row[8] (คอลัมน์ I)
           }
         }).filter(Boolean)
         
@@ -304,7 +304,6 @@ export default function AdminDashboard() {
     }
     reader.readAsArrayBuffer(file)
   }
-
   const handleNameSelect = (name: string, isAdd: boolean) => {
     const matched = masterProducts.find(m => m.name === name)
     const newPrefix = matched ? matched.prefix : '';
