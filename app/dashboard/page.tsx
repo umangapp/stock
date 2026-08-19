@@ -11,7 +11,36 @@ import {
   Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
 
-// ฟังก์ชันแปลงวันที่ DD/MM/YYYY -> YYMMDD สำหรับใช้ผสมในสูตร SKU
+// 🌟 🤖 ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date" (YYYY-MM-DD)
+const formatToDateInput = (dateStr: string) => {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
+  
+  const parts = dateStr.split(/[\/\-]/);
+  if (parts.length === 3) {
+    if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+  }
+
+  if (/^\d{6}$/.test(dateStr)) {
+    const y = dateStr.substring(0, 2);
+    const m = dateStr.substring(2, 4);
+    const d = dateStr.substring(4, 6);
+    return `20${y}-${m}-${d}`;
+  }
+
+  return '';
+};
+
+// 🌟 🤖 ฟังก์ชันแปลงกลับไปเป็น DD/MM/YYYY เพื่อเก็บลงระบบ
+const formatFromDateInput = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
+
+// ฟังก์ชันแปลงวันที่ -> YYMMDD สำหรับผสมในสูตร SKU
 const parseDateToYYMMDD = (dateStr: string): string => {
   if (!dateStr) return '';
   const clean = dateStr.trim();
@@ -20,7 +49,7 @@ const parseDateToYYMMDD = (dateStr: string): string => {
   
   const parts = clean.split(/[\/\-]/);
   if (parts.length === 3) {
-    if (parts[0].length === 4) { // กรณี YYYY-MM-DD
+    if (parts[0].length === 4) {
       return `${parts[0].substring(2)}${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}`;
     }
     let year = parts[2].trim();
@@ -66,7 +95,7 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 🤖 ฟังก์ชันแยกสี SKU Dynamic (รองรับสเปกสีทั้ง Dark และ Light Mode)
+// 🌟 🤖 ฟังก์ชันแยกสี SKU Dynamic
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return <span className="text-slate-500 italic text-sm">พิมพ์หรือประกอบรหัส...</span>;
   const cleanSku = sku.trim();
@@ -133,10 +162,8 @@ export default function AdminDashboard() {
     running: '01', sku_15_digits: '' 
   })
 
-  // 🌟 🤖 ฟังก์ชันประกอบรหัส SKU (เอาจุดทศนิยมออกจากความหนาตามข้อ 1)
   const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
     const pre = prefix || '';
-    // ถอดจุดทศนิยมออก เช่น 0.5 -> 05, 3.2 -> 32
     const h = height !== '' && height !== null && height !== undefined ? String(height).replace(/\./g, '').trim() : '';
     const w = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
     const l = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
@@ -528,7 +555,7 @@ export default function AdminDashboard() {
                                          </div>
                                       )}
                                    </div>
-                                ))}
+                                me))}
                               </div>
                            )}
                         </div>
