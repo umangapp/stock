@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, Minus, Plus, AlertCircle, Package } from 'lucide-react' // 🌟 นำเข้า Package เพิ่มเติม
+import { X, Minus, Plus, AlertCircle, Package } from 'lucide-react' 
 
 const playScanSound = () => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -28,24 +28,29 @@ const playErrorSound = () => {
   oscillator.start(); oscillator.stop(audioCtx.currentTime + 0.5);
 };
 
+// 🌟 🤖 อัปเดตฟังก์ชันสีหน้าสแกนเดี่ยวให้รองรับ Dynamic Length
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  
   const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  const coreLen = cleanSku.length - paddingLen;
   
+  if (coreLen < 8 + preLen) return <span className="font-mono font-black text-[12px]">{cleanSku}</span>;
+
   const p1 = cleanSku.substring(0, preLen);
-  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
-  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
-  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  const p2 = cleanSku.substring(preLen, coreLen - 8); 
+  const p3 = cleanSku.substring(coreLen - 8, coreLen - 2); 
+  const p_num = cleanSku.substring(coreLen - 2, coreLen); 
+  const p4 = cleanSku.substring(coreLen); 
   
   return (
-    <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px]">
+    <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px] sm:text-[14px]">
       <span className="text-blue-600">{p1}</span>
       <span className="text-green-600">{p2}</span>
       <span className="text-orange-500">{p3}</span>
+      <span className="text-pink-600">{p_num}</span>
       <span className="text-slate-400">{p4}</span>
     </span>
   );
@@ -126,7 +131,6 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     <span className="bg-slate-100 px-2 py-0.5 rounded border">LOT: {selectedProduct.received_date}</span>
                 </div>
 
-                {/* 🌟 🤖 เพิ่มการแสดงสต๊อกปัจจุบันตามบรีฟเป๊ะๆ ครับพี่ตั้ม (มีไฮไลต์สีกรม/ฟ้า เด่นชัด) */}
                 <div className="bg-blue-50/60 border border-blue-100/40 p-3 rounded-2xl mb-5 flex justify-between items-center px-5">
                   <div className="flex items-center gap-1.5 text-blue-600">
                     <Package size={14} className="shrink-0" />
@@ -137,7 +141,6 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                   </span>
                 </div>
 
-                {/* ปุ่มลัดเวอร์ชันแก้บั๊กเลข 1 เกิน */}
                 <div className="grid grid-cols-3 gap-3 mb-6">
                     {[5, 10, 50].map(n => (
                         <button 
@@ -150,24 +153,16 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     ))}
                 </div>
 
-                {/* กล่องตัวเลขเวอร์ชันพิมพ์เลขตรงๆ (Key-in) */}
                 <div className="flex items-center justify-between bg-slate-100 p-2 rounded-[2.5rem] mb-6 border border-slate-200">
                     <button onClick={() => setSingleAmount(prev => Math.max(1, prev - 1))} className="w-16 h-16 bg-white rounded-[1.5rem] shadow-sm flex items-center justify-center active:scale-90 shrink-0"><Minus size={24}/></button>
-                    
                     <input 
                       type="number" 
                       min="1"
                       className="flex-1 bg-transparent text-center text-4xl font-black italic text-slate-900 outline-none focus:ring-0 w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       value={singleAmount || ''} 
-                      onChange={(e) => {
-                        const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                        setSingleAmount(val);
-                      }}
-                      onBlur={() => {
-                        if (!singleAmount || singleAmount < 1) setSingleAmount(1);
-                      }}
+                      onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value); setSingleAmount(val); }}
+                      onBlur={() => { if (!singleAmount || singleAmount < 1) setSingleAmount(1); }}
                     />
-
                     <button onClick={() => setSingleAmount(prev => prev + 1)} className="w-16 h-16 bg-white rounded-[1.5rem] shadow-sm flex items-center justify-center active:scale-90 shrink-0"><Plus size={24}/></button>
                 </div>
 
