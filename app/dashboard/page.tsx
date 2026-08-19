@@ -11,7 +11,7 @@ import {
   Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
 
-// 🌟 🤖 ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date" (YYYY-MM-DD)
+// ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date" (YYYY-MM-DD)
 const formatToDateInput = (dateStr: string) => {
   if (!dateStr) return '';
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
@@ -32,7 +32,7 @@ const formatToDateInput = (dateStr: string) => {
   return '';
 };
 
-// 🌟 🤖 ฟังก์ชันแปลงกลับไปเป็น DD/MM/YYYY เพื่อเก็บลงระบบ
+// ฟังก์ชันแปลงกลับไปเป็น DD/MM/YYYY เพื่อเก็บลงระบบ
 const formatFromDateInput = (dateStr: string) => {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
@@ -332,7 +332,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // 🌟 🤖 ปรับการบันทึก: กรองเฉพาะฟิลด์ตรงกับ DB และส่ง Error Message จริงเมื่อล้มเหลว
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
@@ -363,7 +362,6 @@ export default function AdminDashboard() {
     }
   }
 
-  // 🌟 🤖 ปรับการแก้ไข: กรองเฉพาะฟิลด์ตรงกับ DB เช่นกัน
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
@@ -762,32 +760,30 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
-                {/* 🌟 🤖 กล่องแสดงผลรหัส SKU แยกสีไฮไลต์อย่างงาม และช่องแก้ไขเติม X ด้านล่าง */}
+                {/* 🌟 🤖 รวมเป็นกล่องเดียว เนียนและปรับแต่งรหัส SKU ได้ในช่องเดียวเลย */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
                   <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
                   
-                  {/* กล่องโชว์สี SKU */}
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex items-center justify-center mb-3 shadow-inner">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex flex-col items-center justify-center shadow-inner gap-2">
                     <SKUColoredAdmin 
                       sku={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
                       prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
                       isDark={true} 
                     />
+                    
+                    <input 
+                      type="text" 
+                      maxLength={50} 
+                      className="w-full bg-transparent border-t border-white/10 pt-2 font-mono font-bold text-xs text-center text-slate-400 outline-none focus:text-white" 
+                      placeholder="พิมพ์เพื่อแก้ไขรหัส หรือเติมตัว X ท้ายสุด..." 
+                      value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
+                      onChange={e => { 
+                        const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
+                        if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); 
+                        else setEditingProduct({...editingProduct, sku_15_digits: val}); 
+                      }} 
+                    />
                   </div>
-
-                  {/* ช่องแก้ไขอินพุตเติมตัว X เพิ่มเติม */}
-                  <input 
-                    type="text" 
-                    maxLength={50} 
-                    className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-mono font-bold text-sm text-center text-slate-300 outline-none focus:border-blue-500/50" 
-                    placeholder="พิมพ์รหัสเพิ่มเติม หรือเติมตัว X ท้ายสุด..." 
-                    value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
-                    onChange={e => { 
-                      const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
-                      if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); 
-                      else setEditingProduct({...editingProduct, sku_15_digits: val}); 
-                    }} 
-                  />
                   
                   <div className="flex justify-between items-center mt-3 px-2">
                     <p className={`text-xs font-black uppercase tracking-wider ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'text-emerald-500' : 'text-red-500 animate-pulse'}`}>
