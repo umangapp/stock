@@ -8,8 +8,58 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
   ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
-  Users, CheckCircle2, Home, AlertTriangle, Filter
+  Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
+
+// 🌟 🤖 ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date" (YYYY-MM-DD)
+const formatToDateInput = (dateStr: string) => {
+  if (!dateStr) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; // ตรงฟอร์แมตอยู่แล้ว
+  
+  // กรณี 19/08/2025 หรือ 19-08-2025
+  const parts = dateStr.split(/[\/\-]/);
+  if (parts.length === 3) {
+    if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+  }
+
+  // กรณีมาจาก Excel แบบ YYMMDD (เช่น 250819)
+  if (/^\d{6}$/.test(dateStr)) {
+    const y = dateStr.substring(0, 2);
+    const m = dateStr.substring(2, 4);
+    const d = dateStr.substring(4, 6);
+    return `20${y}-${m}-${d}`;
+  }
+
+  return '';
+};
+
+// 🌟 🤖 ฟังก์ชันแปลงกลับไปเป็น DD/MM/YYYY เพื่อเก็บลงระบบ
+const formatFromDateInput = (dateStr: string) => {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
+
+// ฟังก์ชันแปลงวันที่ -> YYMMDD สำหรับผสมในสูตร SKU
+const parseDateToYYMMDD = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const clean = dateStr.trim();
+  
+  if (/^\d{6}$/.test(clean)) return clean; // เป็น 6 หลักอยู่แล้ว
+  
+  const parts = clean.split(/[\/\-]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) { // กรณี YYYY-MM-DD
+      return `${parts[0].substring(2)}${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}`;
+    }
+    let year = parts[2].trim();
+    if (year.length === 4) year = year.substring(2);
+    return `${year}${parts[1].padStart(2, '0')}${parts[0].padStart(2, '0')}`;
+  }
+  return clean.replace(/\D/g, '').substring(0, 6);
+};
 
 const parseExcelDate = (dateVal: any): string => {
   if (!dateVal) return '';
@@ -47,7 +97,7 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 🤖 ฟังก์ชันแยกสี SKU (Dynamic Length อัจฉริยะ)
+// 🌟 🤖 ฟังก์ชันแยกสี SKU Dynamic
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
@@ -110,8 +160,25 @@ export default function AdminDashboard() {
   
   const [newProduct, setNewProduct] = useState({ 
     name: '', prefix: '', height: '', width: '', length: '', 
-    received_date: '', unit: '', current_stock: 0, safety_stock: 0, sku_15_digits: '' 
+    received_date: '', unit: '', current_stock: 0, safety_stock: 0, 
+    running: '01', sku_15_digits: '' 
   })
+
+  const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
+    const pre = prefix || '';
+    const h = height !== '' && height !== null && height !== undefined ? String(height) : '';
+    const w = width !== '' && width !== null && width !== undefined ? String(width) : '';
+    const l = length !== '' && length !== null && length !== undefined ? String(length) : '';
+    const lot = parseDateToYYMMDD(dateStr);
+    const run = running ? String(running).padStart(2, '0').slice(-2) : '01';
+    
+    const generatedCore = `${pre}${h}${w}${l}${lot}${run}`.toUpperCase();
+    
+    const existingPadMatch = currentSKU.match(/[xX]+$/);
+    const existingPad = existingPadMatch ? existingPadMatch[0].toUpperCase() : '';
+    
+    return `${generatedCore}${existingPad}`;
+  };
 
   const checkAdminAccess = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -148,9 +215,8 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData() }, [])
 
-  // 🌟 🤖 ฟังก์ชันดักจับ (อิสระตามความยาว แต่ 2 หลักท้ายต้องเป็นเลข)
   const validateSKU = (sku: string) => {
-    if (!sku || sku.length < 10) return false;
+    if (!sku || sku.length < 8) return false;
     const paddingMatch = sku.match(/[xX]+$/);
     const coreSku = paddingMatch ? sku.slice(0, -paddingMatch[0].length) : sku;
     const twoDigits = coreSku.slice(-2);
@@ -202,15 +268,14 @@ export default function AdminDashboard() {
           const formattedDate = parseExcelDate(row[3]);
           const manualSku = String(row[6] || '').trim().toUpperCase();
           
-          // 🚨 Validation Excel (แบบความยาวอิสระ)
-          if (manualSku.length < 10) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป (ต้องมีอย่างน้อย 10 หลัก) ยกเลิกการ Import ทันที`);
+          if (manualSku.length < 8) {
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
           const paddingMatch = manualSku.match(/[X]+$/i);
           const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
           if (!/^\d{2}$/.test(coreSku.slice(-2))) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักที่อยู่หน้าตัว X ของสินค้า "${row[0]}" ต้องเป็นตัวเลขเท่านั้น (คุณกรอกมาเป็น: ${coreSku.slice(-2)}) ยกเลิกการ Import ทันที`);
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าตัว X ของสินค้า "${row[0]}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
 
@@ -244,9 +309,30 @@ export default function AdminDashboard() {
 
   const handleNameSelect = (name: string, isAdd: boolean) => {
     const matched = masterProducts.find(m => m.name === name)
-    if (isAdd) setNewProduct({ ...newProduct, name, prefix: matched ? matched.prefix : '' })
-    else setEditingProduct({ ...editingProduct, name, prefix: matched ? matched.prefix : '' })
+    const newPrefix = matched ? matched.prefix : '';
+    
+    if (isAdd) {
+      const updated = { ...newProduct, name, prefix: newPrefix };
+      const newSKU = buildSKUFromFields(newPrefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
+      setNewProduct({ ...updated, sku_15_digits: newSKU });
+    } else {
+      const updated = { ...editingProduct, name, prefix: newPrefix };
+      const newSKU = buildSKUFromFields(newPrefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
+      setEditingProduct({ ...updated, sku_15_digits: newSKU });
+    }
   }
+
+  const updateProductAndSKU = (field: string, value: any, isAdd: boolean) => {
+    if (isAdd) {
+      const updated = { ...newProduct, [field]: value };
+      const newSKU = buildSKUFromFields(updated.prefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
+      setNewProduct({ ...updated, sku_15_digits: newSKU });
+    } else {
+      const updated = { ...editingProduct, [field]: value };
+      const newSKU = buildSKUFromFields(updated.prefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
+      setEditingProduct({ ...updated, sku_15_digits: newSKU });
+    }
+  };
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -316,6 +402,15 @@ export default function AdminDashboard() {
             page-break-after: always !important; box-sizing: border-box !important; background-color: #ffffff !important;
           }
         }
+        /* Style for date picker icon */
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          cursor: pointer;
+          opacity: 0.6;
+          transition: 0.2s;
+        }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover {
+          opacity: 1;
+        }
       `}</style>
 
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
@@ -371,7 +466,10 @@ export default function AdminDashboard() {
                   </div>
                   
                   <button onClick={handleImportClick} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"><FileSpreadsheet size={16}/> Import</button>
-                  <button onClick={() => { setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, safety_stock: 0, sku_15_digits: '' }); setIsAddModalOpen(true); }} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
+                  <button onClick={() => { 
+                    setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, safety_stock: 0, running: '01', sku_15_digits: '' }); 
+                    setIsAddModalOpen(true); 
+                  }} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
                </div>
             </div>
 
@@ -442,7 +540,15 @@ export default function AdminDashboard() {
                                                   <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
                                                      <p className={`font-black text-2xl leading-none ${isItemLow ? 'text-red-600' : 'text-slate-900'}`}>{item.current_stock}</p>
                                                      <div className="flex gap-2 shrink-0">
-                                                        <button onClick={() => { setEditingProduct({...item}); setIsEditModalOpen(true); }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Edit3 size={16}/></button>
+                                                        <button onClick={() => { 
+                                                          const sku = item.sku_15_digits || '';
+                                                          const paddingMatch = sku.match(/[xX]+$/);
+                                                          const coreSku = paddingMatch ? sku.slice(0, -paddingMatch[0].length) : sku;
+                                                          const extractedRun = coreSku.length >= 2 ? coreSku.slice(-2) : '01';
+                                                          
+                                                          setEditingProduct({ ...item, running: extractedRun }); 
+                                                          setIsEditModalOpen(true); 
+                                                        }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Edit3 size={16}/></button>
                                                         <button onClick={() => deleteProduct(item.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16}/></button>
                                                      </div>
                                                   </div>
@@ -467,7 +573,6 @@ export default function AdminDashboard() {
 
         {/* TAB อื่นๆ */}
         {activeTab === 'barcode' && ( <BarcodePrintView products={products} /> )}
-        {/* ... TAB dashboard / users / settings โค้ดส่วนนี้ยังเหมือนเดิมเด๊ะเลยครับ พี่ก๊อปทับทั้งหมดได้เลย */}
         
         {/* TAB: ภาพรวมระบบ */}
         {activeTab === 'dashboard' && (
@@ -617,17 +722,20 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
-                {/* 🌟 🤖 กล่องรับรหัส (ปลดล็อกความยาวแล้ว) */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
-                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ความยาวอิสระ)</label>
+                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
                   <input 
                     type="text" 
                     required 
                     maxLength={50} 
                     className={`w-full bg-white/5 border p-4 rounded-2xl font-mono font-black text-lg md:text-2xl uppercase tracking-[0.2em] text-center outline-none ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'border-emerald-500/50 text-emerald-400' : 'border-red-500/50 text-red-400'}`} 
-                    placeholder="พิมพ์รหัสสินค้า..." 
+                    placeholder="พิมพ์หรือประกอบรหัส..." 
                     value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
-                    onChange={e => { const val = e.target.value.replace(/\s+/g, '').toUpperCase(); if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); else setEditingProduct({...editingProduct, sku_15_digits: val}); }} 
+                    onChange={e => { 
+                      const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
+                      if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); 
+                      else setEditingProduct({...editingProduct, sku_15_digits: val}); 
+                    }} 
                   />
                   
                   <div className="flex justify-between items-center mt-3 px-2">
@@ -639,12 +747,55 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อ</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
-                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หนา</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.height : editingProduct.height} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, height: e.target.value}) : setEditingProduct({...editingProduct, height: e.target.value})} /></div>
-                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">กว้าง</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.width : editingProduct.width} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, width: e.target.value}) : setEditingProduct({...editingProduct, width: e.target.value})} /></div>
-                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ยาว</label><input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" value={isAddModalOpen ? newProduct.length : editingProduct.length} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, length: e.target.value}) : setEditingProduct({...editingProduct, length: e.target.value})} /></div>
                 
-                <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot)</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center" placeholder="เช่น 27/11/2025" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
-                <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หนา</label>
+                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
+                    value={isAddModalOpen ? newProduct.height : editingProduct.height} 
+                    onChange={e => updateProductAndSKU('height', e.target.value, isAddModalOpen)} 
+                  />
+                </div>
+                
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">กว้าง</label>
+                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
+                    value={isAddModalOpen ? newProduct.width : editingProduct.width} 
+                    onChange={e => updateProductAndSKU('width', e.target.value, isAddModalOpen)} 
+                  />
+                </div>
+                
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ยาว</label>
+                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
+                    value={isAddModalOpen ? newProduct.length : editingProduct.length} 
+                    onChange={e => updateProductAndSKU('length', e.target.value, isAddModalOpen)} 
+                  />
+                </div>
+                
+                {/* 🌟 🤖 อัปเดตช่องวันที่ให้เป็นปฏิทิน (Mini Calendar) */}
+                <div className="col-span-2 md:col-span-2 relative">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label>
+                  <input 
+                    type="date" 
+                    required 
+                    className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center shadow-sm text-slate-700 uppercase outline-none focus:border-blue-500 cursor-pointer" 
+                    value={formatToDateInput(isAddModalOpen ? newProduct.received_date : editingProduct.received_date)} 
+                    onChange={e => updateProductAndSKU('received_date', formatFromDateInput(e.target.value), isAddModalOpen)} 
+                  />
+                </div>
+
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-blue-600 ml-2 font-bold">Running (2 หลัก)</label>
+                  <input type="text" required maxLength={2} className="w-full bg-blue-50/60 p-4 rounded-2xl border border-blue-200 font-black text-blue-700 text-center" placeholder="01" 
+                    value={isAddModalOpen ? newProduct.running : (editingProduct.running || '01')} 
+                    onChange={e => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      updateProductAndSKU('running', val, isAddModalOpen);
+                    }} 
+                  />
+                </div>
+
+                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
                 
                 <div className="col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100">
                   <label className="text-[10px] font-black uppercase text-red-500 block mb-1">Safety Stock (จุดแจ้งเตือน)</label>
