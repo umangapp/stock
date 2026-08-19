@@ -332,19 +332,62 @@ export default function AdminDashboard() {
     }
   };
 
+  // 🌟 🤖 ปรับการบันทึก: กรองเฉพาะฟิลด์ตรงกับ DB และส่ง Error Message จริงเมื่อล้มเหลว
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
-    const { error } = await supabase.from('products').insert([{ ...newProduct, current_stock: Number(newProduct.current_stock), safety_stock: Number(newProduct.safety_stock) }])
-    if (!error) { setIsAddModalOpen(false); fetchData(); }
-    else { alert("❌ เกิดข้อผิดพลาด: รหัส SKU นี้อาจซ้ำกับสินค้าอื่นในระบบ"); }
+    
+    const dbPayload = {
+      name: newProduct.name,
+      prefix: newProduct.prefix,
+      height: Number(newProduct.height) || 0,
+      width: Number(newProduct.width) || 0,
+      length: Number(newProduct.length) || 0,
+      received_date: newProduct.received_date,
+      unit: newProduct.unit,
+      current_stock: Number(newProduct.current_stock) || 0,
+      safety_stock: Number(newProduct.safety_stock) || 0,
+      sku_15_digits: newProduct.sku_15_digits
+    }
+
+    const { error } = await supabase.from('products').insert([dbPayload])
+    if (!error) { 
+      setIsAddModalOpen(false); 
+      fetchData(); 
+    } else { 
+      if (error.code === '23505') {
+        alert("❌ เกิดข้อผิดพลาด: รหัส SKU นี้มีอยู่ในระบบแล้วครับ");
+      } else {
+        alert(`❌ เกิดข้อผิดพลาดจากระบบ: ${error.message}`);
+      }
+    }
   }
 
+  // 🌟 🤖 ปรับการแก้ไข: กรองเฉพาะฟิลด์ตรงกับ DB เช่นกัน
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
-    const { error } = await supabase.from('products').update({ ...editingProduct, current_stock: Number(editingProduct.current_stock), safety_stock: Number(editingProduct.safety_stock) }).eq('id', editingProduct.id)
-    if (!error) { setIsEditModalOpen(false); fetchData(); }
+    
+    const dbPayload = {
+      name: editingProduct.name,
+      prefix: editingProduct.prefix,
+      height: Number(editingProduct.height) || 0,
+      width: Number(editingProduct.width) || 0,
+      length: Number(editingProduct.length) || 0,
+      received_date: editingProduct.received_date,
+      unit: editingProduct.unit,
+      current_stock: Number(editingProduct.current_stock) || 0,
+      safety_stock: Number(editingProduct.safety_stock) || 0,
+      sku_15_digits: editingProduct.sku_15_digits
+    }
+
+    const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
+    if (!error) { 
+      setIsEditModalOpen(false); 
+      fetchData(); 
+    } else {
+      alert(`❌ ไม่สามารถอัปเดตได้: ${error.message}`);
+    }
   }
 
   const deleteProduct = async (id: string) => {
