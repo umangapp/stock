@@ -2,9 +2,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, Zap, AlertCircle, Package } from 'lucide-react'
+import { X, ShoppingCart, Minus, Plus, Trash2, CheckCircle2, Loader2, AlertCircle, Package } from 'lucide-react'
 
-// --- 🔊 ฟังก์ชันเสียงสแกนติด (Industrial Beep) ---
 const playScanSound = () => {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -19,7 +18,6 @@ const playScanSound = () => {
   } catch (e) { console.error("Sound play error", e); }
 };
 
-// --- 🔊 ฟังก์ชันเสียง Error (สต๊อกไม่พอ) ---
 const playErrorSound = () => {
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -34,25 +32,29 @@ const playErrorSound = () => {
   } catch (e) { console.error("Sound play error", e); }
 };
 
-// --- 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU ประจำโหมดสแกนต่อเนื่อง ---
+// 🌟 🤖 อัปเดตฟังก์ชันสีหน้าระบบสแกนต่อเนื่อง (Dynamic Length)
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  
   const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  const coreLen = cleanSku.length - paddingLen;
   
+  if (coreLen < 8 + preLen) return <span className="font-mono font-black text-[12px]">{cleanSku}</span>;
+
   const p1 = cleanSku.substring(0, preLen);
-  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
-  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
-  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  const p2 = cleanSku.substring(preLen, coreLen - 8); 
+  const p3 = cleanSku.substring(coreLen - 8, coreLen - 2); 
+  const p_num = cleanSku.substring(coreLen - 2, coreLen); 
+  const p4 = cleanSku.substring(coreLen); 
   
   return (
     <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[12px]">
       <span className="text-blue-600">{p1}</span>
       <span className="text-green-600">{p2}</span>
       <span className="text-orange-500">{p3}</span>
+      <span className="text-pink-600">{p_num}</span>
       <span className="text-slate-400">{p4}</span>
     </span>
   );
@@ -126,13 +128,10 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
     } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); } finally { setIsSaving(false); }
   }
 
-  // 🌟 🤖 ฟังก์ชันอัปเดตจำนวนจากช่องกรอก Key-in
   const handleAmountChange = (id: string, newAmount: number) => {
-    const validAmount = Math.max(1, newAmount || 1); // บังคับห้ามต่ำกว่า 1
-    
+    const validAmount = Math.max(1, newAmount || 1); 
     setBasket(prev => prev.map(item => {
       if (item.id === id) {
-        // ถ้าเป็นโหมดเบิกออก ต้องเช็กสต๊อกไม่ให้กรอกเกิน
         if (scanMode === 'issue' && validAmount > item.current_stock) {
           playErrorSound();
           alert(`❌ สต๊อกไม่พอจ่าย! (คงเหลือ: ${item.current_stock})`);
@@ -167,8 +166,6 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {basket.map((item, index) => (
                 <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex flex-col shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
-                   
-                   {/* แถวบน: ข้อมูลสินค้า */}
                    <div className="flex justify-between items-start mb-4">
                      <div className="flex-1 pr-4">
                         <div className="flex items-center gap-2 mb-1 leading-none">
@@ -184,46 +181,29 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
                    </div>
 
-                   {/* 🌟 🤖 แถวล่าง: โชว์สต๊อกปัจจุบัน + ตัวควบคุมจำนวนแบบ Input */}
                    <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-                      
-                      {/* ข้อมูลสต๊อกเดิม */}
                       <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
                         <Package size={12} className="shrink-0" />
                         <span className="text-[10px] font-black uppercase tracking-widest leading-none">Stock: {item.current_stock}</span>
                       </div>
-
-                      {/* ตัวคุมจำนวน (เปลี่ยนตรงกลางเป็น Input Field) */}
                       <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-2 border border-slate-200">
                          <button onClick={() => handleAmountChange(item.id, item.amount - 1)} className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm active:scale-90 transition-all"><Minus size={16}/></button>
-                         
-                         {/* 🌟 🤖 กล่อง Input กรอกมือ */}
                          <input 
                            type="number" 
                            min="1"
                            className="font-black text-slate-900 text-lg w-12 text-center leading-none bg-transparent outline-none focus:ring-0 focus:border-b-2 focus:border-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                            value={item.amount || ''}
-                           onChange={(e) => {
-                             const val = e.target.value === '' ? 0 : parseInt(e.target.value);
-                             handleAmountChange(item.id, val);
-                           }}
-                           onBlur={(e) => {
-                             if (!e.target.value || parseInt(e.target.value) < 1) {
-                               handleAmountChange(item.id, 1);
-                             }
-                           }}
+                           onChange={(e) => { const val = e.target.value === '' ? 0 : parseInt(e.target.value); handleAmountChange(item.id, val); }}
+                           onBlur={(e) => { if (!e.target.value || parseInt(e.target.value) < 1) handleAmountChange(item.id, 1); }}
                          />
-
                          <button onClick={() => handleAmountChange(item.id, item.amount + 1)} className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm active:scale-90 transition-all"><Plus size={16}/></button>
                       </div>
                    </div>
-
                 </div>
              ))}
           </div>
       </div>
 
-      {/* --- หน้าจอสรุปรายการชุด (Batch Summary Modal) --- */}
       {showBatchSummary && (
           <div className="fixed inset-0 bg-slate-900/98 backdrop-blur-2xl z-[500] flex items-center justify-center p-4">
               <div className="bg-white w-full max-w-md rounded-[3rem] p-8 flex flex-col max-h-[90vh] animate-in zoom-in duration-300">
@@ -232,7 +212,6 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                      <h3 className="text-2xl font-black uppercase italic text-slate-900 leading-none">สรุปยอดรวม</h3>
                      <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase tracking-widest">ตรวจสอบ {basket.length} รายการในชุด</p>
                   </div>
-
                   <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
                       {basket.map(item => (
                           <div key={item.id} className="bg-slate-50 p-5 rounded-[2rem] border border-slate-100 flex justify-between items-center shadow-sm">
@@ -254,14 +233,9 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                           </div>
                       ))}
                   </div>
-
                   <div className="flex gap-4 shrink-0">
                       <button onClick={() => setShowBatchSummary(false)} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-100 uppercase text-xs">แก้ไขเพิ่ม</button>
-                      <button 
-                        onClick={handleFinalSave} 
-                        disabled={isSaving} 
-                        className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2`}
-                      >
+                      <button onClick={handleFinalSave} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2`}>
                         {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} ยืนยันบันทึกทั้งหมด
                       </button>
                   </div>
