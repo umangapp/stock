@@ -47,20 +47,22 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 🤖 อัปเดตฟังก์ชันแยกสี SKU (21 Digits Version)
+// 🌟 🤖 ฟังก์ชันแยกสี SKU (Dynamic Length อัจฉริยะ)
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
   if (!sku) return null;
+  const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
-  const paddingMatch = sku.match(/[xX]+$/);
+  const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  const coreLen = sku.length - paddingLen;
+  const coreLen = cleanSku.length - paddingLen;
   
-  // แบ่งโซนสีใหม่สำหรับ 21 หลัก: Prefix | Dims | Lot(6) | Num(2) | Pad(X)
-  const p1 = sku.substring(0, preLen);
-  const p4 = sku.substring(coreLen); // ตัว X
-  const p_num = sku.substring(coreLen - 2, coreLen); // 2 หลักท้ายที่บังคับเป็นตัวเลข
-  const p3 = sku.substring(coreLen - 8, coreLen - 2); // Lot date 6 หลัก
-  const p2 = sku.substring(preLen, coreLen - 8); // สเปก/ขนาด
+  if (coreLen < 8 + preLen) return <span className="font-mono font-black">{cleanSku}</span>;
+
+  const p1 = cleanSku.substring(0, preLen);
+  const p2 = cleanSku.substring(preLen, coreLen - 8); 
+  const p3 = cleanSku.substring(coreLen - 8, coreLen - 2); 
+  const p_num = cleanSku.substring(coreLen - 2, coreLen); 
+  const p4 = cleanSku.substring(coreLen); 
   
   const colors = isDark 
     ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", num: "text-pink-400", pad: "text-slate-500" } 
@@ -88,11 +90,9 @@ export default function AdminDashboard() {
   const [userProfiles, setUserProfiles] = useState<any[]>([]) 
   const [loading, setLoading] = useState(true)
   
-  // Filter States
   const [searchQuery, setSearchQuery] = useState('')
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   
-  // 3-Layer Accordion States
   const [expandedL1, setExpandedL1] = useState<string[]>([])
   const [expandedL2, setExpandedL2] = useState<string[]>([])
   const [expandedL3, setExpandedL3] = useState<string[]>([])
@@ -148,13 +148,13 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData() }, [])
 
-  // 🌟 🤖 ฟังก์ชันเช็กความถูกต้องของ SKU (21 หลัก และ 2 หลักหน้า X ต้องเป็นเลข)
+  // 🌟 🤖 ฟังก์ชันดักจับ (อิสระตามความยาว แต่ 2 หลักท้ายต้องเป็นเลข)
   const validateSKU = (sku: string) => {
-    if (sku.length !== 21) return false;
+    if (!sku || sku.length < 10) return false;
     const paddingMatch = sku.match(/[xX]+$/);
     const coreSku = paddingMatch ? sku.slice(0, -paddingMatch[0].length) : sku;
     const twoDigits = coreSku.slice(-2);
-    return /^\d{2}$/.test(twoDigits); // ดักจับว่าเป็นเลข 0-9 ทั้งสองตัวหรือไม่
+    return /^\d{2}$/.test(twoDigits); 
   }
 
   const handleUpdateUserName = async (id: string, newName: string) => {
@@ -202,12 +202,12 @@ export default function AdminDashboard() {
           const formattedDate = parseExcelDate(row[3]);
           const manualSku = String(row[6] || '').trim().toUpperCase();
           
-          // 🚨 Validation Excel 21 หลัก
-          if (manualSku.length !== 21) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU ยาว ${manualSku.length} หลัก (ระบบบังคับ 21 หลักพอดีเป๊ะ) ยกเลิกการ Import ทันที`);
+          // 🚨 Validation Excel (แบบความยาวอิสระ)
+          if (manualSku.length < 10) {
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป (ต้องมีอย่างน้อย 10 หลัก) ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
-          const paddingMatch = manualSku.match(/[X]+$/);
+          const paddingMatch = manualSku.match(/[X]+$/i);
           const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
           if (!/^\d{2}$/.test(coreSku.slice(-2))) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักที่อยู่หน้าตัว X ของสินค้า "${row[0]}" ต้องเป็นตัวเลขเท่านั้น (คุณกรอกมาเป็น: ${coreSku.slice(-2)}) ยกเลิกการ Import ทันที`);
@@ -224,7 +224,7 @@ export default function AdminDashboard() {
             unit: String(row[4] || '').trim(), 
             current_stock: Number(row[5] || 0), 
             sku_15_digits: manualSku,
-            safety_stock: Number(row[7] || 0) // 🚨 ดึง Safety Stock จากคอลัมน์ H
+            safety_stock: Number(row[7] || 0) 
           }
         }).filter(Boolean)
         
@@ -250,7 +250,7 @@ export default function AdminDashboard() {
 
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องยาว 21 หลัก และ 2 หลักหน้าตัว X ต้องเป็นตัวเลขครับ"); return; }
+    if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     const { error } = await supabase.from('products').insert([{ ...newProduct, current_stock: Number(newProduct.current_stock), safety_stock: Number(newProduct.safety_stock) }])
     if (!error) { setIsAddModalOpen(false); fetchData(); }
     else { alert("❌ เกิดข้อผิดพลาด: รหัส SKU นี้อาจซ้ำกับสินค้าอื่นในระบบ"); }
@@ -258,7 +258,7 @@ export default function AdminDashboard() {
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รหัส SKU ต้องยาว 21 หลัก และ 2 หลักหน้าตัว X ต้องเป็นตัวเลขครับ"); return; }
+    if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     const { error } = await supabase.from('products').update({ ...editingProduct, current_stock: Number(editingProduct.current_stock), safety_stock: Number(editingProduct.safety_stock) }).eq('id', editingProduct.id)
     if (!error) { setIsEditModalOpen(false); fetchData(); }
   }
@@ -277,32 +277,25 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
-  // 🌟 🤖 อัลกอริทึมจัดกลุ่ม 3 Layer (Name -> Height -> Lot Date)
   const grouped3LayerInventory = products
-    .filter(p => !showLowStockOnly || p.current_stock <= (p.safety_stock || 0)) // 🚨 Filter กรองเฉพาะสินค้าใกล้หมดถ้าปุ่มเปิดอยู่
+    .filter(p => !showLowStockOnly || p.current_stock <= (p.safety_stock || 0))
     .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.prefix.toLowerCase().includes(searchQuery.toLowerCase()))
     .reduce((acc: any, item: any) => {
-      
       const isLowStock = item.current_stock <= (item.safety_stock || 0);
 
-      // Layer 1: ชื่อสินค้า
       if (!acc[item.name]) acc[item.name] = { name: item.name, prefix: item.prefix || 'XXX', totalStock: 0, unit: item.unit, hasLowStock: false, heights: {} };
       acc[item.name].totalStock += item.current_stock;
       if (isLowStock) acc[item.name].hasLowStock = true;
 
-      // Layer 2: ความหนา
       if (!acc[item.name].heights[item.height]) acc[item.name].heights[item.height] = { height: item.height, totalStock: 0, hasLowStock: false, lots: {} };
       acc[item.name].heights[item.height].totalStock += item.current_stock;
       if (isLowStock) acc[item.name].heights[item.height].hasLowStock = true;
 
-      // Layer 3: Lot Date
       if (!acc[item.name].heights[item.height].lots[item.received_date]) acc[item.name].heights[item.height].lots[item.received_date] = { lot: item.received_date, totalStock: 0, hasLowStock: false, items: [] };
       acc[item.name].heights[item.height].lots[item.received_date].totalStock += item.current_stock;
       if (isLowStock) acc[item.name].heights[item.height].lots[item.received_date].hasLowStock = true;
 
-      // Pack Item
       acc[item.name].heights[item.height].lots[item.received_date].items.push(item);
-
       return acc;
   }, {});
 
@@ -364,7 +357,6 @@ export default function AdminDashboard() {
                <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สต๊อกสินค้า</h2>
                
                <div className="flex flex-wrap gap-3 w-full xl:w-auto">
-                  {/* 🚨 ปุ่มกรอง Low Stock */}
                   <button 
                     onClick={() => setShowLowStockOnly(!showLowStockOnly)}
                     className={`px-5 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-sm active:scale-95 transition-all border ${showLowStockOnly ? 'bg-red-600 text-white border-red-700 shadow-red-600/30' : 'bg-white text-slate-500 border-slate-200 hover:bg-red-50'}`}
@@ -383,11 +375,8 @@ export default function AdminDashboard() {
                </div>
             </div>
 
-            {/* 🌟 🤖 UI 3 Layer แบบขั้นบันได */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
               {Object.values(grouped3LayerInventory).sort((a: any, b: any) => a.prefix.localeCompare(b.prefix)).map((l1: any) => (
-                
-                /* LAYER 1: หมวดหมู่สินค้า */
                 <div key={l1.name} className={`bg-white rounded-[2.5rem] border shadow-sm overflow-hidden h-fit transition-all ${l1.hasLowStock ? 'border-red-400 ring-4 ring-red-500/10' : 'border-slate-200'}`}>
                   <div onClick={() => setExpandedL1(prev => prev.includes(l1.name) ? prev.filter(n => n !== l1.name) : [...prev, l1.name])} className="p-6 cursor-pointer hover:bg-slate-50 flex justify-between items-center text-slate-800">
                     <div className="flex-1 pr-4">
@@ -409,8 +398,6 @@ export default function AdminDashboard() {
                   {expandedL1.includes(l1.name) && (
                     <div className="p-4 bg-slate-50/80 space-y-3 border-t border-slate-100">
                       {Object.values(l1.heights).sort((a: any, b: any) => parseFloat(a.height) - parseFloat(b.height)).map((l2: any) => (
-                        
-                        /* LAYER 2: ความหนา */
                         <div key={l2.height} className={`bg-white rounded-[2rem] border shadow-sm overflow-hidden transition-all ${l2.hasLowStock ? 'border-red-300' : 'border-slate-200'}`}>
                            <div onClick={() => setExpandedL2(prev => prev.includes(`${l1.name}-${l2.height}`) ? prev.filter(n => n !== `${l1.name}-${l2.height}`) : [...prev, `${l1.name}-${l2.height}`])} className="p-5 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
                               <div className="flex items-center gap-2">
@@ -426,8 +413,6 @@ export default function AdminDashboard() {
                            {expandedL2.includes(`${l1.name}-${l2.height}`) && (
                               <div className="p-3 bg-slate-50 space-y-2 border-t border-slate-100">
                                 {Object.values(l2.lots).sort((a: any, b: any) => a.lot.localeCompare(b.lot)).map((l3: any) => (
-                                   
-                                   /* LAYER 3: Lot Date */
                                    <div key={l3.lot} className={`bg-white rounded-3xl border transition-all ${l3.hasLowStock ? 'border-red-300' : 'border-slate-200'}`}>
                                       <div onClick={() => setExpandedL3(prev => prev.includes(`${l1.name}-${l2.height}-${l3.lot}`) ? prev.filter(n => n !== `${l1.name}-${l2.height}-${l3.lot}`) : [...prev, `${l1.name}-${l2.height}-${l3.lot}`])} className="p-4 cursor-pointer hover:bg-slate-50 flex justify-between items-center">
                                          <div className="flex items-center gap-2 text-sm font-bold text-slate-600">
@@ -439,7 +424,6 @@ export default function AdminDashboard() {
                                          </div>
                                       </div>
 
-                                      {/* LAYER 4: SKU Items */}
                                       {expandedL3.includes(`${l1.name}-${l2.height}-${l3.lot}`) && (
                                          <div className="p-2 space-y-2 border-t border-slate-100 bg-slate-50/50">
                                             {l3.items.map((item: any) => {
@@ -481,9 +465,10 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* TAB: สร้างบาร์โค้ด */}
+        {/* TAB อื่นๆ */}
         {activeTab === 'barcode' && ( <BarcodePrintView products={products} /> )}
-
+        {/* ... TAB dashboard / users / settings โค้ดส่วนนี้ยังเหมือนเดิมเด๊ะเลยครับ พี่ก๊อปทับทั้งหมดได้เลย */}
+        
         {/* TAB: ภาพรวมระบบ */}
         {activeTab === 'dashboard' && (
           <div className="space-y-8 animate-in fade-in no-print">
@@ -609,7 +594,6 @@ export default function AdminDashboard() {
                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-black">{masterUnits.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.unit}</span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_units').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
                 </div>
              </div>
-
            </div>
         )}
       </main>
@@ -633,24 +617,24 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
-                {/* 🌟 🤖 กล่องรับรหัส 21 หลัก */}
+                {/* 🌟 🤖 กล่องรับรหัส (ปลดล็อกความยาวแล้ว) */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
-                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ล็อกสเปก 21 หลัก)</label>
+                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ความยาวอิสระ)</label>
                   <input 
                     type="text" 
                     required 
-                    maxLength={21} 
+                    maxLength={50} 
                     className={`w-full bg-white/5 border p-4 rounded-2xl font-mono font-black text-lg md:text-2xl uppercase tracking-[0.2em] text-center outline-none ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'border-emerald-500/50 text-emerald-400' : 'border-red-500/50 text-red-400'}`} 
-                    placeholder="พิมพ์รหัส 21 หลัก..." 
+                    placeholder="พิมพ์รหัสสินค้า..." 
                     value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
                     onChange={e => { const val = e.target.value.replace(/\s+/g, '').toUpperCase(); if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); else setEditingProduct({...editingProduct, sku_15_digits: val}); }} 
                   />
                   
                   <div className="flex justify-between items-center mt-3 px-2">
-                    <p className={`text-xs font-black uppercase tracking-wider ${((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length === 21 ? 'text-emerald-500' : 'text-red-500 animate-pulse'}`}>
-                      พิมพ์แล้ว: {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length} / 21
+                    <p className={`text-xs font-black uppercase tracking-wider ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'text-emerald-500' : 'text-red-500 animate-pulse'}`}>
+                      ความยาว: {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length} หลัก
                     </p>
-                    <p className="text-[10px] text-slate-400 italic">2 หลักหน้าชุด X ท้ายสุด ต้องเป็นตัวเลขเท่านั้น</p>
+                    <p className="text-[10px] text-slate-400 italic text-right">2 หลักท้ายสุด (หรือหน้าชุด X) ต้องเป็นตัวเลข</p>
                   </div>
                 </div>
                 
@@ -662,7 +646,6 @@ export default function AdminDashboard() {
                 <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot)</label><input type="text" required className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center" placeholder="เช่น 27/11/2025" value={isAddModalOpen ? newProduct.received_date : editingProduct.received_date} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, received_date: e.target.value}) : setEditingProduct({...editingProduct, received_date: e.target.value})} /></div>
                 <div className="col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
                 
-                {/* 🌟 🤖 กล่อง Safety Stock และ สต๊อกเริ่มต้น */}
                 <div className="col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100">
                   <label className="text-[10px] font-black uppercase text-red-500 block mb-1">Safety Stock (จุดแจ้งเตือน)</label>
                   <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-red-600 outline-none" 
@@ -685,7 +668,7 @@ export default function AdminDashboard() {
               </div>
               
               <button type="submit" disabled={!validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits)} className={`w-full py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl transition-all ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'bg-blue-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                {validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'บันทึกข้อมูลสินค้า' : '❌ รหัส SKU ไม่ผ่านเงื่อนไข 21 หลัก'}
+                {validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'บันทึกข้อมูลสินค้า' : '❌ รหัส SKU ไม่ถูกต้องตามโครงสร้าง'}
               </button>
             </form>
           </div>
