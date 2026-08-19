@@ -11,43 +11,12 @@ import {
   Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
 
-// 🌟 🤖 ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date" (YYYY-MM-DD)
-const formatToDateInput = (dateStr: string) => {
-  if (!dateStr) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr; // ตรงฟอร์แมตอยู่แล้ว
-  
-  // กรณี 19/08/2025 หรือ 19-08-2025
-  const parts = dateStr.split(/[\/\-]/);
-  if (parts.length === 3) {
-    if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-  }
-
-  // กรณีมาจาก Excel แบบ YYMMDD (เช่น 250819)
-  if (/^\d{6}$/.test(dateStr)) {
-    const y = dateStr.substring(0, 2);
-    const m = dateStr.substring(2, 4);
-    const d = dateStr.substring(4, 6);
-    return `20${y}-${m}-${d}`;
-  }
-
-  return '';
-};
-
-// 🌟 🤖 ฟังก์ชันแปลงกลับไปเป็น DD/MM/YYYY เพื่อเก็บลงระบบ
-const formatFromDateInput = (dateStr: string) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  return dateStr;
-};
-
-// ฟังก์ชันแปลงวันที่ -> YYMMDD สำหรับผสมในสูตร SKU
+// ฟังก์ชันแปลงวันที่ DD/MM/YYYY -> YYMMDD สำหรับใช้ผสมในสูตร SKU
 const parseDateToYYMMDD = (dateStr: string): string => {
   if (!dateStr) return '';
   const clean = dateStr.trim();
   
-  if (/^\d{6}$/.test(clean)) return clean; // เป็น 6 หลักอยู่แล้ว
+  if (/^\d{6}$/.test(clean)) return clean;
   
   const parts = clean.split(/[\/\-]/);
   if (parts.length === 3) {
@@ -97,9 +66,9 @@ const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 🤖 ฟังก์ชันแยกสี SKU Dynamic
+// 🌟 🤖 ฟังก์ชันแยกสี SKU Dynamic (รองรับสเปกสีทั้ง Dark และ Light Mode)
 const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
-  if (!sku) return null;
+  if (!sku) return <span className="text-slate-500 italic text-sm">พิมพ์หรือประกอบรหัส...</span>;
   const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
   const paddingMatch = cleanSku.match(/[xX]+$/);
@@ -119,7 +88,7 @@ const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix:
     : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", num: "text-pink-600", pad: "text-slate-400" };
     
   return (
-    <span className="font-mono font-black tracking-widest uppercase italic tracking-normal text-[11px] sm:text-[13px]">
+    <span className="font-mono font-black tracking-[0.15em] uppercase italic tracking-normal text-lg sm:text-2xl break-all">
       <span className={colors.pre}>{p1}</span>
       <span className={colors.dim}>{p2}</span>
       <span className={colors.lot}>{p3}</span>
@@ -164,11 +133,13 @@ export default function AdminDashboard() {
     running: '01', sku_15_digits: '' 
   })
 
+  // 🌟 🤖 ฟังก์ชันประกอบรหัส SKU (เอาจุดทศนิยมออกจากความหนาตามข้อ 1)
   const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
     const pre = prefix || '';
-    const h = height !== '' && height !== null && height !== undefined ? String(height) : '';
-    const w = width !== '' && width !== null && width !== undefined ? String(width) : '';
-    const l = length !== '' && length !== null && length !== undefined ? String(length) : '';
+    // ถอดจุดทศนิยมออก เช่น 0.5 -> 05, 3.2 -> 32
+    const h = height !== '' && height !== null && height !== undefined ? String(height).replace(/\./g, '').trim() : '';
+    const w = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
+    const l = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
     const lot = parseDateToYYMMDD(dateStr);
     const run = running ? String(running).padStart(2, '0').slice(-2) : '01';
     
@@ -402,7 +373,6 @@ export default function AdminDashboard() {
             page-break-after: always !important; box-sizing: border-box !important; background-color: #ffffff !important;
           }
         }
-        /* Style for date picker icon */
         input[type="date"]::-webkit-calendar-picker-indicator {
           cursor: pointer;
           opacity: 0.6;
@@ -722,14 +692,25 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
+                {/* 🌟 🤖 กล่องแสดงผลรหัส SKU แยกสีไฮไลต์อย่างงาม และช่องแก้ไขเติม X ด้านล่าง */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
                   <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
+                  
+                  {/* กล่องโชว์สี SKU */}
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex items-center justify-center mb-3 shadow-inner">
+                    <SKUColoredAdmin 
+                      sku={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
+                      prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
+                      isDark={true} 
+                    />
+                  </div>
+
+                  {/* ช่องแก้ไขอินพุตเติมตัว X เพิ่มเติม */}
                   <input 
                     type="text" 
-                    required 
                     maxLength={50} 
-                    className={`w-full bg-white/5 border p-4 rounded-2xl font-mono font-black text-lg md:text-2xl uppercase tracking-[0.2em] text-center outline-none ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'border-emerald-500/50 text-emerald-400' : 'border-red-500/50 text-red-400'}`} 
-                    placeholder="พิมพ์หรือประกอบรหัส..." 
+                    className="w-full bg-white/5 border border-white/10 p-3 rounded-xl font-mono font-bold text-sm text-center text-slate-300 outline-none focus:border-blue-500/50" 
+                    placeholder="พิมพ์รหัสเพิ่มเติม หรือเติมตัว X ท้ายสุด..." 
                     value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
                     onChange={e => { 
                       const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
@@ -772,7 +753,6 @@ export default function AdminDashboard() {
                   />
                 </div>
                 
-                {/* 🌟 🤖 อัปเดตช่องวันที่ให้เป็นปฏิทิน (Mini Calendar) */}
                 <div className="col-span-2 md:col-span-2 relative">
                   <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label>
                   <input 
