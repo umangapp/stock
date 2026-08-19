@@ -159,7 +159,7 @@ export default function AdminDashboard() {
   const [newProduct, setNewProduct] = useState({ 
     name: '', prefix: '', height: '', width: '', length: '', 
     received_date: '', unit: '', current_stock: 0, safety_stock: 0, 
-    running: '01', sku_15_digits: '' 
+    running: '01', weight: '', sku_15_digits: '' 
   })
 
   const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
@@ -240,7 +240,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
- const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -264,7 +264,7 @@ export default function AdminDashboard() {
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
           const formattedDate = parseExcelDate(row[3]);
-          const manualSku = String(row[7] || '').trim().toUpperCase(); // ขยับเป็น row[7] (คอลัมน์ H)
+          const manualSku = String(row[7] || '').trim().toUpperCase();
           
           if (manualSku.length < 8) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
@@ -284,10 +284,10 @@ export default function AdminDashboard() {
             width: wVal ? parseFloat(wVal) : 0, 
             length: lVal ? parseFloat(lVal) : 0, 
             received_date: formattedDate, 
-            unit: String(row[5] || '').trim(), // ขยับเป็น row[5] (คอลัมน์ F)
-            current_stock: Number(row[6] || 0), // ขยับเป็น row[6] (คอลัมน์ G)
+            unit: String(row[5] || '').trim(), 
+            current_stock: Number(row[6] || 0), 
             sku_15_digits: manualSku,
-            safety_stock: Number(row[8] || 0) // ขยับเป็น row[8] (คอลัมน์ I)
+            safety_stock: Number(row[8] || 0) 
           }
         }).filter(Boolean)
         
@@ -304,6 +304,7 @@ export default function AdminDashboard() {
     }
     reader.readAsArrayBuffer(file)
   }
+
   const handleNameSelect = (name: string, isAdd: boolean) => {
     const matched = masterProducts.find(m => m.name === name)
     const newPrefix = matched ? matched.prefix : '';
@@ -335,7 +336,7 @@ export default function AdminDashboard() {
     e.preventDefault()
     if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     
-    const dbPayload = {
+    const dbPayload: any = {
       name: newProduct.name,
       prefix: newProduct.prefix,
       height: Number(newProduct.height) || 0,
@@ -346,6 +347,10 @@ export default function AdminDashboard() {
       current_stock: Number(newProduct.current_stock) || 0,
       safety_stock: Number(newProduct.safety_stock) || 0,
       sku_15_digits: newProduct.sku_15_digits
+    }
+
+    if (newProduct.unit?.includes('กก')) {
+      dbPayload.weight = Number(newProduct.weight) || null;
     }
 
     const { error } = await supabase.from('products').insert([dbPayload])
@@ -365,7 +370,7 @@ export default function AdminDashboard() {
     e.preventDefault()
     if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     
-    const dbPayload = {
+    const dbPayload: any = {
       name: editingProduct.name,
       prefix: editingProduct.prefix,
       height: Number(editingProduct.height) || 0,
@@ -376,6 +381,10 @@ export default function AdminDashboard() {
       current_stock: Number(editingProduct.current_stock) || 0,
       safety_stock: Number(editingProduct.safety_stock) || 0,
       sku_15_digits: editingProduct.sku_15_digits
+    }
+
+    if (editingProduct.unit?.includes('กก')) {
+      dbPayload.weight = Number(editingProduct.weight) || null;
     }
 
     const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
@@ -504,7 +513,7 @@ export default function AdminDashboard() {
                   
                   <button onClick={handleImportClick} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"><FileSpreadsheet size={16}/> Import</button>
                   <button onClick={() => { 
-                    setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, safety_stock: 0, running: '01', sku_15_digits: '' }); 
+                    setNewProduct({ name: '', prefix: '', height: '', width: '', length: '', received_date: '', unit: '', current_stock: 0, safety_stock: 0, running: '01', weight: '', sku_15_digits: '' }); 
                     setIsAddModalOpen(true); 
                   }} className="bg-blue-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs shadow-lg active:scale-95 transition-all"><Plus className="inline mr-1"/> เพิ่มใหม่</button>
                </div>
@@ -569,6 +578,7 @@ export default function AdminDashboard() {
                                                     <div className="mb-1"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
                                                     <div className="flex flex-wrap items-center gap-2 mt-2">
                                                         <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">ขนาด {item.height}x{item.width}x{item.length}</span>
+                                                        {item.weight && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded uppercase border border-amber-200">น้ำหนัก: {item.weight} กก.</span>}
                                                         <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${isItemLow ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                                           {isItemLow ? `⚠️ ต่ำกว่า Safety (${item.safety_stock})` : `Safety: ${item.safety_stock || 0}`}
                                                         </span>
@@ -583,7 +593,7 @@ export default function AdminDashboard() {
                                                           const coreSku = paddingMatch ? sku.slice(0, -paddingMatch[0].length) : sku;
                                                           const extractedRun = coreSku.length >= 2 ? coreSku.slice(-2) : '01';
                                                           
-                                                          setEditingProduct({ ...item, running: extractedRun }); 
+                                                          setEditingProduct({ ...item, running: extractedRun, weight: item.weight || '' }); 
                                                           setIsEditModalOpen(true); 
                                                         }} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><Edit3 size={16}/></button>
                                                         <button onClick={() => deleteProduct(item.id)} className="p-2.5 bg-red-50 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16}/></button>
@@ -759,7 +769,6 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
-                {/* 🌟 🤖 รวมเป็นกล่องเดียว เนียนและปรับแต่งรหัส SKU ได้ในช่องเดียวเลย */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
                   <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
                   
@@ -840,7 +849,37 @@ export default function AdminDashboard() {
                   />
                 </div>
 
-                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label><select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" value={isAddModalOpen ? newProduct.unit : editingProduct.unit} onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}>{masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}</select></div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label>
+                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" 
+                    value={isAddModalOpen ? newProduct.unit : editingProduct.unit} 
+                    onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}
+                  >
+                    <option value="">-- เลือกหน่วยนับ --</option>
+                    {masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}
+                  </select>
+                </div>
+
+                {/* 🌟 🤖 เพิ่มช่องน้ำหนักแบบ Dynamic (แสดงเฉพาะเมื่อเลือกหน่วยนับ กก.) */}
+                {(isAddModalOpen ? newProduct.unit : editingProduct.unit)?.includes('กก') && (
+                  <div className="col-span-2 md:col-span-1 animate-in fade-in">
+                    <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (1-999 กก.)</label>
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="999" 
+                      className="w-full bg-amber-50/60 p-4 rounded-2xl border border-amber-300 font-black text-amber-700 text-center outline-none focus:border-amber-500 shadow-sm" 
+                      placeholder="เช่น 50" 
+                      value={isAddModalOpen ? newProduct.weight : (editingProduct.weight || '')} 
+                      onChange={e => {
+                        const val = Math.min(999, Math.max(0, parseInt(e.target.value) || 0));
+                        const strVal = val === 0 ? '' : String(val);
+                        if (isAddModalOpen) setNewProduct({ ...newProduct, weight: strVal });
+                        else setEditingProduct({ ...editingProduct, weight: strVal });
+                      }} 
+                    />
+                  </div>
+                )}
                 
                 <div className="col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100">
                   <label className="text-[10px] font-black uppercase text-red-500 block mb-1">Safety Stock (จุดแจ้งเตือน)</label>
