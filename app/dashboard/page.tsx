@@ -350,7 +350,7 @@ export default function AdminDashboard() {
     }
 
     if (newProduct.unit?.includes('กก')) {
-      dbPayload.weight = Number(newProduct.weight) || null;
+      dbPayload.weight = newProduct.weight !== '' ? parseFloat(Number(newProduct.weight).toFixed(2)) : null;
     }
 
     const { error } = await supabase.from('products').insert([dbPayload])
@@ -384,7 +384,7 @@ export default function AdminDashboard() {
     }
 
     if (editingProduct.unit?.includes('กก')) {
-      dbPayload.weight = Number(editingProduct.weight) || null;
+      dbPayload.weight = editingProduct.weight !== '' && editingProduct.weight !== null ? parseFloat(Number(editingProduct.weight).toFixed(2)) : null;
     }
 
     const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
@@ -605,7 +605,7 @@ export default function AdminDashboard() {
                                          </div>
                                       )}
                                    </div>
-                                ))}
+                                me))}
                               </div>
                            )}
                         </div>
@@ -860,22 +860,22 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* 🌟 🤖 เพิ่มช่องน้ำหนักแบบ Dynamic (แสดงเฉพาะเมื่อเลือกหน่วยนับ กก.) */}
+                {/* 🌟 🤖 ช่องน้ำหนัก (รองรับทศนิยม 2 ตำแหน่ง) */}
                 {(isAddModalOpen ? newProduct.unit : editingProduct.unit)?.includes('กก') && (
                   <div className="col-span-2 md:col-span-1 animate-in fade-in">
-                    <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (1-999 กก.)</label>
+                    <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (กก. - ทศนิยม 2 ตำแหน่ง)</label>
                     <input 
                       type="number" 
-                      min="1" 
+                      step="0.01" 
+                      min="0.01" 
                       max="999" 
                       className="w-full bg-amber-50/60 p-4 rounded-2xl border border-amber-300 font-black text-amber-700 text-center outline-none focus:border-amber-500 shadow-sm" 
-                      placeholder="เช่น 50" 
+                      placeholder="เช่น 50.25" 
                       value={isAddModalOpen ? newProduct.weight : (editingProduct.weight || '')} 
                       onChange={e => {
-                        const val = Math.min(999, Math.max(0, parseInt(e.target.value) || 0));
-                        const strVal = val === 0 ? '' : String(val);
-                        if (isAddModalOpen) setNewProduct({ ...newProduct, weight: strVal });
-                        else setEditingProduct({ ...editingProduct, weight: strVal });
+                        const val = e.target.value;
+                        if (isAddModalOpen) setNewProduct({ ...newProduct, weight: val });
+                        else setEditingProduct({ ...editingProduct, weight: val });
                       }} 
                     />
                   </div>
