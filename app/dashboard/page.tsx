@@ -240,7 +240,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
@@ -264,22 +264,36 @@ export default function AdminDashboard() {
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
           const formattedDate = parseExcelDate(row[3]);
-          const manualSku = String(row[7] || '').trim().toUpperCase();
+          const prefix = String(row[1] || 'XXX').trim().toUpperCase();
+          const runningVal = String(row[4] || '01').padStart(2, '0').slice(-2);
           
+          let manualSku = String(row[7] || '').trim().toUpperCase(); // คอลัมน์ H (SKU)
+          
+          // 🌟 🤖 ถ้าเว้นว่างช่อง SKU ไว้ ให้ระบบสร้างให้อัตโนมัติจากสูตรทันที
+          if (!manualSku) {
+            const hClean = hVal.replace(/\./g, '');
+            const wClean = wVal.replace(/\./g, '');
+            const lClean = lVal.replace(/\./g, '');
+            const lotFormatted = parseDateToYYMMDD(formattedDate);
+            
+            manualSku = `${prefix}${hClean}${wClean}${lClean}${lotFormatted}${runningVal}`;
+          }
+
+          // ตรวจสอบความถูกต้องของ SKU
           if (manualSku.length < 8) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" ระบุรหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" รหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
           const paddingMatch = manualSku.match(/[X]+$/i);
           const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
           if (!/^\d{2}$/.test(coreSku.slice(-2))) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าตัว X ของสินค้า "${row[0]}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักท้ายสุดของ SKU สินค้า "${row[0]}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
 
           return { 
             name: String(row[0]).trim(), 
-            prefix: String(row[1] || 'XXX').trim().toUpperCase(), 
+            prefix: prefix, 
             height: hVal ? parseFloat(hVal) : 0, 
             width: wVal ? parseFloat(wVal) : 0, 
             length: lVal ? parseFloat(lVal) : 0, 
