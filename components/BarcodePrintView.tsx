@@ -361,7 +361,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                         </p>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                       <QRCodeCanvas value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span className="font-mono font-black tracking-widest mt-0.5 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
                     </div>
