@@ -1,305 +1,226 @@
 'use client'
-import { useState, useEffect, useRef, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { Home, LogOut, Search, Scan, Zap, ShoppingCart, CheckCircle2, Trash2, Plus, Minus, PackageMinus } from 'lucide-react'
-import SKUColoredAdmin from '@/components/SKUColored'
+import { useRouter } from 'next/navigation' 
+// 🌟 🤖 นำเข้าไอคอน Home และ LogOut เพิ่มเติมเรียบร้อยครับ
+import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info, Home, LogOut } from 'lucide-react'
+import SingleScanner from './SingleScanner'
+import BatchScanner from './BatchScanner'
 
-function ScanPageContent() {
+// 🌟 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (ดักจับ X ใหญ่ + ปลายสายปรับเป็นสีเทา Slate ตามสั่งเรียบร้อยครับพี่ตั้ม)
+const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
+  if (!sku) return null;
+  const cleanSku = sku.trim();
+  const preLen = prefix?.length || 2;
+  
+  // 🔒 เปลี่ยนเป็น /[xX]+$/ เพื่อดักจับทั้ง x เล็ก และ X ใหญ่ ไม่ให้ตำแหน่งตัวเลขเลื่อนพัง
+  const paddingMatch = cleanSku.match(/[xX]+$/);
+  const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
+  
+  const p1 = cleanSku.substring(0, preLen);
+  const p4 = cleanSku.substring(cleanSku.length - paddingLen);
+  const p3 = cleanSku.substring(cleanSku.length - paddingLen - 6, cleanSku.length - paddingLen);
+  const p2 = cleanSku.substring(preLen, cleanSku.length - paddingLen - 6);
+  
+  return (
+    <span className="font-mono font-black tracking-widest uppercase italic leading-none text-[11px]">
+      <span className="text-blue-600">{p1}</span>
+      <span className="text-green-600">{p2}</span>
+      <span className="text-orange-500">{p3}</span>
+      {/* 🔒 เปลี่ยนจาก text-cyan-400 เดิม ให้กลายเป็นสีเทา text-slate-400 ตามสเปกใหม่ครับ */}
+      <span className="text-slate-400">{p4}</span>
+    </span>
+  );
+};
+
+export default function ScanPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const urlMode = searchParams.get('mode') 
-  
-  const [scanMode, setScanMode] = useState<'receive' | 'issue'>(urlMode === 'issue' ? 'issue' : 'receive')
-  const [scanType, setScanType] = useState<'single' | 'continuous'>('single')
+  const [view, setView] = useState<'menu' | 'single' | 'batch'>('menu')
+  const [scanMode, setScanMode] = useState<'receive' | 'issue'>('receive')
+  const [activeUser, setActiveName] = useState('')
+  const [appVersion, setAppVersion] = useState('1.1.2')
+  const [scanDelay, setScanDelay] = useState(1000)
+  const [personalLogs, setPersonalLogs] = useState<any[]>([])
+  const [showHistory, setShowHistory] = useState(false)
   const [scanInput, setScanInput] = useState('')
-  const [scannedItems, setScannedItems] = useState<any[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
-  
-  // Ref สำหรับออโต้โฟกัสให้เครื่องสแกนบาร์โค้ด
-  const inputRef = useRef<HTMLInputElement>(null)
 
+  // 🌟 🤖 อ่านค่าโหมดจาก URL อย่างปลอดภัย ไม่ให้กระทบระบบกล้อง
+  const [urlMode, setUrlMode] = useState<string | null>(null)
   useEffect(() => {
-    if (urlMode === 'issue') setScanMode('issue')
-    else if (urlMode === 'receive') setScanMode('receive')
-  }, [urlMode])
-
-  // ฟังก์ชันเมื่อกดเลือกปุ่มโหมดสแกน
-  const handleModeSelect = (mode: 'receive' | 'issue', type: 'single' | 'continuous') => {
-    setScanMode(mode)
-    setScanType(type)
-    // 🌟 เล็งเคอร์เซอร์ไปที่กล่องข้อความอัตโนมัติ เพื่อให้ยิงบาร์โค้ดได้เลย
-    inputRef.current?.focus()
-  }
-
-  // ฟังก์ชันยิงบาร์โค้ด หรือค้นหา
-  const handleBarcodeSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault()
-    const code = scanInput.trim().toUpperCase()
-    if (!code) return
-    
-    setIsProcessing(true)
-    const { data: product } = await supabase
-      .from('products')
-      .select('*')
-      .eq('sku_15_digits', code)
-      .maybeSingle()
-      
-    if (product) {
-      setScannedItems(prev => {
-        const existIdx = prev.findIndex(p => p.id === product.id)
-        if (existIdx >= 0) {
-          const updated = [...prev]
-          updated[existIdx].scan_qty += 1
-          return updated
-        }
-        return [{ ...product, scan_qty: 1 }, ...prev]
-      })
-    } else {
-      alert(`❌ ไม่พบสินค้ารหัส: ${code}`)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      setUrlMode(params.get('mode'))
     }
-    
-    // ล้างช่อง และโฟกัสรอรับการสแกนชิ้นต่อไป
-    setScanInput('')
-    setTimeout(() => inputRef.current?.focus(), 100)
-    setIsProcessing(false)
-  }
+  }, [])
 
-  const updateQty = (id: string, delta: number) => {
-    setScannedItems(prev => prev.map(item => {
-      if (item.id === id) {
-        const newQty = item.scan_qty + delta
-        return newQty > 0 ? { ...item, scan_qty: newQty } : item
-      }
-      return item
-    }))
-  }
-
-  const removeItem = (id: string) => {
-    setScannedItems(prev => prev.filter(item => item.id !== id))
-  }
-
-  // ยืนยันบันทึกลงฐานข้อมูล
-  const handleSave = async () => {
-    if (scannedItems.length === 0) return
+  const fetchData = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    const userEmail = session?.user?.email || 'Unknown'
+    if (!session) { router.push('/login'); return; }
+    
+    const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', session.user.id).single()
+    const userName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0]
+    setActiveName(userName)
+    
+    const { data: logs } = await supabase.from('transactions')
+      .select('*, products(*)')
+      .eq('created_by', userName)
+      .order('created_at', { ascending: false })
+      .limit(30)
+    
+    setPersonalLogs(logs || [])
 
-    try {
-      for (const item of scannedItems) {
-        const amount = item.scan_qty
-        const newStock = scanMode === 'receive' 
-          ? item.current_stock + amount 
-          : Math.max(0, item.current_stock - amount)
+    const { data: conf } = await supabase.from('settings_app_config').select('*').single()
+    if (conf) { setAppVersion(conf.version); setScanDelay(conf.scan_delay || 1000); }
+  }, [router])
 
-        await supabase.from('products').update({ current_stock: newStock }).eq('id', item.id)
+  useEffect(() => { fetchData() }, [fetchData])
 
-        await supabase.from('transactions').insert([{
-          product_id: item.id,
-          type: scanMode,
-          amount: amount,
-          created_by: userEmail
-        }])
-      }
-
-      alert('✅ บันทึกรายการสแกนสำเร็จ!')
-      setScannedItems([])
-      setScanInput('')
-      inputRef.current?.focus()
-    } catch (err: any) {
-      alert('❌ เกิดข้อผิดพลาด: ' + err.message)
-    }
+  const handleManualSearch = () => {
+    if (!scanInput.trim()) { alert("⚠️ กรุณากรอกรหัสสินค้าก่อนค้นหา"); return; }
+    setView('single');
   }
+
+  if (view === 'single') return <SingleScanner scanMode={scanMode} activeUser={activeUser} initialSKU={scanInput} onRefresh={fetchData} onClose={() => { setView('menu'); setScanInput(''); }} />
+  if (view === 'batch') return <BatchScanner scanMode={scanMode} activeUser={activeUser} scanDelay={scanDelay} onRefresh={fetchData} onClose={() => setView('menu')} />
 
   return (
-    <div className="min-h-screen bg-[#0b0f19] text-white font-sans flex flex-col pt-6 select-none overflow-x-hidden">
+    <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
       
-      {/* 🌟 Top Header */}
-      <div className="flex justify-between items-center px-4 sm:px-6 mb-6">
+      {/* 🔒 🤖 แถบหัวบนแบบโมเดิร์น ล็อกพื้นที่ให้พอดีจอมือถือ ปุ่มแอกชันฝั่งขวาใช้ระบบ Icon เพียวๆ ไม่ตกบรรทัดครับ */}
+      <header className="px-4 py-4 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-50 shrink-0">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black italic text-blue-400 uppercase tracking-tight">SCAN CENTER</h1>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">VERSION 1.1.2</p>
+          <h1 className="text-xs font-black uppercase italic text-blue-400 leading-none">Scan Center</h1>
+          <p className="text-[8px] font-black text-slate-500 uppercase mt-1">Version {appVersion}</p>
         </div>
-
+        
+        {/* รวมกลุ่มปุ่มควบคุมฝั่งขวา */}
         <div className="flex items-center gap-2">
-          <button onClick={() => router.push('/')} className="p-3 bg-[#131b2e] hover:bg-[#1e293b] text-amber-400 rounded-2xl shadow-sm transition-all active:scale-95">
-            <Home size={20} />
+          {/* ปุ่มประวัติรายการแบบย่อ ขนาดกระทัดรัดสำหรับมือถือ */}
+          <button 
+            onClick={() => { fetchData(); setShowHistory(true); }} 
+            className="bg-blue-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg whitespace-nowrap active:scale-95 transition-all"
+          >
+            ประวัติ
           </button>
-          <button onClick={() => { if(confirm("ออกจากระบบ?")) supabase.auth.signOut().then(() => router.push('/login')) }} className="p-3 bg-[#1a1215] hover:bg-[#2b1720] text-red-400 rounded-2xl shadow-sm transition-all active:scale-95">
-            <LogOut size={20} />
+          
+          {/* 🏠 ปุ่มกลับหน้าเมนูหลัก */}
+          <button 
+            onClick={() => router.push('/')} 
+            className="p-2 bg-slate-800 text-amber-400 border border-slate-700/60 rounded-xl active:scale-95 transition-all shadow-md"
+            title="กลับหน้าเมนูหลัก"
+          >
+            <Home size={18} />
+          </button>
+          
+          {/* 🚪 ปุ่มออกจากระบบ */}
+          <button 
+            onClick={() => {
+              if(confirm("🔒 ยืนยันการออกจากระบบพนักงานหรือไม่?")) {
+                supabase.auth.signOut().then(() => router.push('/login'))
+              }
+            }} 
+            className="p-2 bg-red-950/40 text-red-400 border border-red-900/30 rounded-xl active:scale-95 transition-all shadow-md"
+            title="ออกจากระบบ"
+          >
+            <LogOut size={18} />
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* 🌟 Status Badge */}
-      <div className="flex justify-center px-6 mb-6">
-        <div className="flex items-center gap-2 bg-[#131b2e] border border-[#1e293b] px-4 py-2 rounded-full shadow-inner text-xs font-bold text-slate-400">
-          <span>โหมดปัจจุบัน:</span>
-          <span className={`px-2 py-0.5 rounded-full font-black text-[11px] ${scanMode === 'receive' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
-            {scanMode === 'receive' ? 'นำเข้า (+)' : 'เบิกจ่าย (-)'}
+      <main className="flex-1 p-6 flex flex-col gap-8 justify-center max-w-sm mx-auto w-full animate-in fade-in">
+        <div className="text-center mb-[-15px]">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">โหมดปัจจุบัน: </span>
+          <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded ${urlMode === 'receive' || scanMode === 'receive' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+            {urlMode === 'receive' || scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}
           </span>
         </div>
-      </div>
 
-      {/* 🌟 2x2 Grid Buttons (กรองตาม URL) */}
-      <div className="grid grid-cols-2 gap-4 mb-6 max-w-md mx-auto w-full px-4 sm:px-6">
+        <div className="grid grid-cols-2 gap-4">
+           {/* 🌟 🤖 ซ่อน/แสดง ปุ่มนำเข้า (ทีละชิ้น และ ต่อเนื่อง) */}
+           {(!urlMode || urlMode === 'receive') && (
+             <>
+               <button onClick={() => { setScanMode('receive'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-green-400"/><span className="text-[11px] font-black uppercase text-center">นำเข้า<br/>(ทีละชิ้น)</span></button>
+               <button onClick={() => { setScanMode('receive'); setView('batch'); }} className="aspect-square bg-green-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-green-800 shadow-xl shadow-green-900/20"><Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white">นำเข้า<br/>(ต่อเนื่อง)</span></button>
+             </>
+           )}
+           
+           {/* 🌟 🤖 ซ่อน/แสดง ปุ่มนำออก (ทีละชิ้น และ ต่อเนื่อง) */}
+           {(!urlMode || urlMode === 'issue') && (
+             <>
+               <button onClick={() => { setScanMode('issue'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-red-400"/><span className="text-[11px] font-black uppercase text-center leading-tight">นำออก<br/>(ทีละชิ้น)</span></button>
+               <button onClick={() => { setScanMode('issue'); setView('batch'); }} className="aspect-square bg-red-600 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-red-800 shadow-xl shadow-red-900/20"><Zap size={40} className="text-white animate-pulse"/><span className="text-[11px] font-black uppercase text-center text-white leading-tight">นำออก<br/>(ต่อเนื่อง)</span></button>
+             </>
+           )}
+        </div>
         
-        {/* กลุ่มปุ่ม นำเข้า */}
-        {(!urlMode || urlMode === 'receive') && (
-          <>
-            <button 
-              onClick={() => handleModeSelect('receive', 'single')}
-              className={`p-6 rounded-[2rem] border flex flex-col items-center justify-center gap-3 transition-all active:scale-95 ${scanMode === 'receive' && scanType === 'single' ? 'bg-[#1e293b] border-emerald-500 text-white shadow-lg' : 'bg-[#131b2e] border-transparent text-slate-400 hover:bg-[#1e293b]'}`}
-            >
-              <Scan size={36} className={scanMode === 'receive' && scanType === 'single' ? 'text-emerald-400' : 'text-emerald-500/50'} />
-              <div className="text-center">
-                <p className="font-black text-sm uppercase leading-tight">นำเข้า</p>
-                <p className="text-[10px] italic">(ทีละชิ้น)</p>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => handleModeSelect('receive', 'continuous')}
-              className={`p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all active:scale-95 border ${scanMode === 'receive' && scanType === 'continuous' ? 'bg-emerald-500 border-emerald-400 text-white shadow-lg shadow-emerald-500/30' : 'bg-emerald-900/20 text-emerald-500 border-emerald-900/30 hover:bg-emerald-900/40'}`}
-            >
-              <Zap size={36} className={scanMode === 'receive' && scanType === 'continuous' ? 'fill-white text-white' : 'fill-emerald-500/30 text-emerald-500/50'} />
-              <div className="text-center">
-                <p className="font-black text-sm uppercase leading-tight">นำเข้า</p>
-                <p className="text-[10px] italic">(ต่อเนื่อง)</p>
-              </div>
-            </button>
-          </>
-        )}
-
-        {/* กลุ่มปุ่ม นำออก */}
-        {(!urlMode || urlMode === 'issue') && (
-          <>
-            <button 
-              onClick={() => handleModeSelect('issue', 'single')}
-              className={`p-6 rounded-[2rem] border flex flex-col items-center justify-center gap-3 transition-all active:scale-95 ${scanMode === 'issue' && scanType === 'single' ? 'bg-[#1e293b] border-rose-500 text-white shadow-lg' : 'bg-[#131b2e] border-transparent text-slate-400 hover:bg-[#1e293b]'}`}
-            >
-              <Scan size={36} className={scanMode === 'issue' && scanType === 'single' ? 'text-rose-400' : 'text-rose-500/50'} />
-              <div className="text-center">
-                <p className="font-black text-sm uppercase leading-tight">นำออก</p>
-                <p className="text-[10px] italic">(ทีละชิ้น)</p>
-              </div>
-            </button>
-
-            <button 
-              onClick={() => handleModeSelect('issue', 'continuous')}
-              className={`p-6 rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all active:scale-95 border ${scanMode === 'issue' && scanType === 'continuous' ? 'bg-rose-500 border-rose-400 text-white shadow-lg shadow-rose-500/30' : 'bg-rose-900/20 text-rose-500 border-rose-900/30 hover:bg-rose-900/40'}`}
-            >
-              <Zap size={36} className={scanMode === 'issue' && scanType === 'continuous' ? 'fill-white text-white' : 'fill-rose-500/30 text-rose-500/50'} />
-              <div className="text-center">
-                <p className="font-black text-sm uppercase leading-tight">นำออก</p>
-                <p className="text-[10px] italic">(ต่อเนื่อง)</p>
-              </div>
-            </button>
-          </>
-        )}
-
-      </div>
-
-      {/* 🌟 Search Bar / ช่องรับค่าบาร์โค้ด */}
-      <form onSubmit={handleBarcodeSubmit} className="max-w-md mx-auto w-full mb-6 px-4 sm:px-6">
         <div className="relative">
           <input 
-            ref={inputRef}
             type="text" 
             placeholder="พิมพ์รหัส 15 หลัก..." 
-            className="w-full bg-[#131b2e] border border-slate-700/60 p-5 pr-14 rounded-2xl text-white placeholder-slate-500 font-bold outline-none focus:border-blue-500 transition-all text-center tracking-wider"
-            value={scanInput}
-            onChange={e => setScanInput(e.target.value)}
-            disabled={isProcessing}
-            autoFocus
+            className="w-full bg-slate-900 border border-white/10 p-5 rounded-2xl outline-none text-center font-black uppercase text-sm shadow-inner" 
+            value={scanInput} 
+            onChange={(e) => setScanInput(e.target.value)}
+            onKeyDown={(e) => { if(e.key === 'Enter') handleManualSearch(); }}
           />
-          <button type="submit" disabled={isProcessing} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 hover:text-white p-2 transition-all">
-            <Search size={22} />
+          <button onClick={handleManualSearch} className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 p-2 active:scale-90 transition-all">
+            <Search size={24}/>
           </button>
         </div>
-      </form>
+      </main>
+      
+      {/* History Overlay */}
+      {showHistory && (
+          <div className="absolute inset-0 bg-[#0a0f18] z-[120] flex flex-col animate-in slide-in-from-right duration-300">
+              <header className="px-6 py-6 flex justify-between items-center bg-[#1e293b] border-b border-white/5">
+                  <div className="flex items-center gap-2"><Clock className="text-blue-500" size={20}/><h3 className="text-2xl font-black uppercase text-white italic tracking-tighter">History</h3></div>
+                  <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-1.5 bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                      <User size={12} className="text-blue-400"/>
+                      <span className="text-[10px] font-black text-blue-100 uppercase tracking-tight">{activeUser}</span>
+                    </div>
+                  </div>
+              </header>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 pb-10">
+                  {personalLogs.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-slate-600 opacity-50"><Info size={48} className="mb-2"/><p className="font-black uppercase text-xs">ไม่พบประวัติรายการของคุณ</p></div>
+                  ) : (
+                    personalLogs.map(log => (
+                      <div key={log.id} className="bg-white rounded-[1.8rem] p-5 text-slate-900 border-l-[10px] shadow-xl border-blue-500">
+                          <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                  <p className="font-black text-sm uppercase leading-none mb-1.5">{log.products?.name}</p>
+                                  <SKUColored sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
+                                  
+                                  {/* 🌟 🤖 เพิ่มการแสดงผลน้ำหนัก ต่อจากขนาดและ LOT ตรงนี้เลยครับ */}
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 text-[9px] font-bold text-slate-400 italic uppercase">
+                                     <span>{log.products?.height}x{log.products?.width}x{log.products?.length} มม.</span>
+                                     <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-500">LOT: {log.products?.received_date}</span>
+                                     
+                                     {log.products?.weight && (
+                                       <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
+                                         ⚖️ {log.products.weight} กก.
+                                       </span>
+                                     )}
+                                  </div>
 
-      {/* 🌟 ตะกร้าสินค้าสีสว่าง (เด้งขึ้นมาจากด้านล่าง) */}
-      {scannedItems.length > 0 && (
-        <div className="bg-white flex-1 px-4 sm:px-6 pt-8 pb-24 mt-2 rounded-t-[3rem] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] animate-in slide-in-from-bottom-8">
-          <div className="max-w-md mx-auto w-full space-y-4">
-            
-            {/* Header ตะกร้า */}
-            <div className="flex justify-between items-center bg-white p-2 mb-2">
-              <div className="flex items-center gap-3 font-black text-lg text-slate-800">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-full"><ShoppingCart size={22}/></div>
-                รายการที่สแกน ({scannedItems.length})
+                                  <p className="text-[10px] font-bold text-blue-600 mt-2 italic leading-none">STOCK: {log.old_stock} → {log.new_stock}</p>
+                              </div>
+                              <div className="text-right shrink-0">
+                                  <span className={`text-2xl font-black leading-none ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'}{log.amount}</span>
+                                  <p className="text-[9px] font-black uppercase text-slate-300 mt-1">{log.products?.unit}</p>
+                              </div>
+                          </div>
+                          <div className="pt-3 border-t border-slate-50 flex justify-between items-center text-[9px] font-black text-slate-300 uppercase italic">
+                              <div className="flex items-center gap-1"><Clock size={10}/>{new Date(log.created_at).toLocaleTimeString('th-TH')} | {new Date(log.created_at).toLocaleDateString('th-TH')}</div>
+                              <span className={log.type === 'receive' ? 'text-green-400' : 'text-red-400'}>{log.type === 'receive' ? 'INVENTORY IN' : 'INVENTORY OUT'}</span>
+                          </div>
+                      </div>
+                    ))
+                  )}
               </div>
-              <button onClick={handleSave} className="bg-emerald-500 hover:bg-emerald-400 text-white px-5 py-3 rounded-2xl font-bold text-sm flex items-center gap-2 shadow-md transition-all active:scale-95">
-                <CheckCircle2 size={18}/> ยืนยันบันทึก
-              </button>
-            </div>
-
-            {/* รายการสินค้าในการ์ดสีขาว */}
-            <div className="space-y-4">
-              {scannedItems.map((item, idx) => (
-                <div key={item.id} className="bg-white p-6 rounded-[2rem] shadow-sm border border-blue-100 relative text-slate-800">
-                  
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      {idx === 0 && <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider">Latest</span>}
-                      <h3 className="font-black text-lg text-slate-800">{item.name}</h3>
-                    </div>
-                    <button onClick={() => removeItem(item.id)} className="p-2 bg-rose-50 text-rose-400 rounded-xl hover:bg-rose-100 hover:text-rose-500 transition-all">
-                      <Trash2 size={20}/>
-                    </button>
-                  </div>
-
-                  <div className="mb-3">
-                    <SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} isDark={false} />
-                  </div>
-
-                  {/* 🌟 ขนาด, LOT และ "น้ำหนัก" */}
-                  <div className="flex flex-wrap items-center gap-2 mb-6">
-                    <span className="text-[11px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded">
-                      {item.height}x{item.width}x{item.length} มม.
-                    </span>
-                    <span className="text-[11px] font-black text-slate-600 bg-slate-100 border border-slate-200 px-2 py-1 rounded">
-                      LOT: {item.received_date}
-                    </span>
-                    
-                    {/* ⚖️ ระบบโชว์น้ำหนัก (ถ้าสินค้าชิ้นนั้นมีการใส่น้ำหนักไว้) */}
-                    {item.weight && (
-                      <span className="text-[11px] font-black text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded shadow-sm">
-                        ⚖️ น้ำหนัก: {item.weight} กก.
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between items-center border-t border-slate-100 pt-4">
-                    <span className="flex items-center gap-1.5 text-xs font-black text-blue-600 bg-blue-50 px-3 py-1.5 rounded-xl uppercase tracking-wider">
-                      <PackageMinus size={14}/> STOCK: {item.current_stock}
-                    </span>
-
-                    <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-2xl border border-slate-200">
-                      <button onClick={() => updateQty(item.id, -1)} className="p-2 bg-white rounded-xl shadow-sm text-slate-400 hover:text-slate-700"><Minus size={20}/></button>
-                      <span className="font-black text-2xl w-10 text-center text-slate-800">{item.scan_qty}</span>
-                      <button onClick={() => updateQty(item.id, 1)} className="p-2 bg-blue-600 rounded-xl shadow-sm text-white hover:bg-blue-500"><Plus size={20}/></button>
-                    </div>
-                  </div>
-
-                </div>
-              ))}
-            </div>
-
+              <button onClick={() => setShowHistory(false)} className="m-6 bg-slate-800 py-5 rounded-3xl font-black uppercase text-xs flex items-center justify-center gap-2"><X size={16}/> Close History</button>
           </div>
-        </div>
       )}
-
     </div>
-  )
-}
-
-// ห่อด้วย Suspense เพื่อแก้บั๊กตอนดึงค่า ?mode= ออกจาก URL ของ Next.js
-export default function ScanPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0b0f19] flex items-center justify-center font-black text-blue-400 italic">LOADING SCAN CENTER...</div>}>
-      <ScanPageContent />
-    </Suspense>
   )
 }
