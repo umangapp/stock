@@ -130,7 +130,6 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     <span className="bg-slate-100 px-2 py-0.5 rounded border">LOT: {selectedProduct.received_date}</span>
                 </div>
 
-                {/* 🌟 แสดงน้ำหนัก (ถ้ามี) */}
                 {selectedProduct.weight && (
                   <div className="bg-amber-50/60 border border-amber-200/60 p-3 rounded-2xl mb-2 flex justify-between items-center px-5">
                     <div className="flex items-center gap-1.5 text-amber-700">
@@ -143,14 +142,13 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                   </div>
                 )}
 
-                {/* 🌟 แสดงสต๊อกปัจจุบัน (ไม่แสดงหน่วย) */}
                 <div className="bg-blue-50/60 border border-blue-100/40 p-3 rounded-2xl mb-5 flex justify-between items-center px-5">
                   <div className="flex items-center gap-1.5 text-blue-600">
                     <Package size={14} className="shrink-0" />
                     <span className="text-[10px] font-black uppercase tracking-widest">สต๊อกปัจจุบัน</span>
                   </div>
                   <span className="font-black text-xl text-slate-800">
-                    {selectedProduct.current_stock}
+                    {selectedProduct.current_stock} {!selectedProduct.weight && <span className="text-xs font-bold text-slate-400 uppercase">{selectedProduct.unit}</span>}
                   </span>
                 </div>
 
@@ -206,7 +204,17 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     {selectedProduct.weight && (
                       <div className="flex justify-between border-b border-slate-100 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">น้ำหนัก</span><span className="font-black text-lg text-slate-800">{Number(selectedProduct.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</span></div>
                     )}
-                    <div className="flex justify-between border-b border-slate-100 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">จำนวนสแกน</span><span className="font-black text-2xl text-slate-900">{singleAmount} {selectedProduct.unit}</span></div>
+                    
+                    {/* 🌟 เช็ก weight: ถ้ามีน้ำหนักใช้ "จำนวน" + ซ่อนหน่วย / ถ้าไม่มีใช้ "จำนวนสแกน" + แสดงหน่วย */}
+                    <div className="flex justify-between border-b border-slate-100 pb-3">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {selectedProduct.weight ? 'จำนวน' : 'จำนวนสแกน'}
+                      </span>
+                      <span className="font-black text-2xl text-slate-900">
+                        {singleAmount} {!selectedProduct.weight && selectedProduct.unit}
+                      </span>
+                    </div>
+
                     <div className="bg-slate-50 p-5 rounded-[2rem] border shadow-inner">
                         <div className="flex justify-between text-xs font-bold text-slate-500"><span>สต๊อกเดิม:</span><span>{selectedProduct.current_stock}</span></div>
                         <div className="flex justify-between text-lg font-black mt-2 pt-2 border-t border-slate-200 italic"><span>สต๊อกใหม่:</span><span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? selectedProduct.current_stock + singleAmount : selectedProduct.current_stock - singleAmount}</span></div>
