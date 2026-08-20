@@ -184,7 +184,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
       
       {/* แผงควบคุมตั้งค่าระบบบาร์โค้ด */}
       <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6 no-print text-slate-800">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex flex-col md:flex-row justifyContent-between items-start md:items-center gap-4">
           <div>
             <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">สร้างบาร์โค้ดสินค้า</h2>
             <p className="text-xs text-slate-400 font-bold mt-1">ระบบจัดพิมพ์สติ๊กเกอร์ล็อกความละเอียดตารางจัดวาง (แนวตั้ง 3x3 รวม 9 ดวง / แนวนอน 3x5 รวม 15 ดวงต่อแผ่น)</p>
@@ -246,7 +246,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
               value={fontSize} onChange={e => handleFontSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่ (30px)</span></div>
+            <div className="flex justifyContent-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (12px)</span><span>ใหญ่ (30px)</span></div>
           </div>
 
           <div className="space-y-2">
@@ -258,7 +258,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600" 
               value={qrSize} onChange={e => handleQrSizeChange(Number(e.target.value))} 
             />
-            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ใหญ่ (250px)</span></div>
+            <div className="flex justifyContent-between text-[10px] font-black text-slate-400 uppercase"><span>เล็ก (70px)</span><span>ใหญ่ (250px)</span></div>
           </div>
 
           <div className="space-y-2">
@@ -267,14 +267,14 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
               <button 
                 type="button"
                 onClick={() => handleLayoutModeChange('vertical')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'vertical' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
+                className={`flex items-center justifyContent-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'vertical' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
               >
                 <Rows size={16}/> แนวตั้ง (3x3 ตาราง)
               </button>
               <button 
                 type="button"
                 onClick={() => handleLayoutModeChange('horizontal')}
-                className={`flex items-center justify-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'horizontal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
+                className={`flex items-center justifyContent-center gap-2 p-3 rounded-xl font-black text-xs uppercase shadow-sm border transition-all ${layoutMode === 'horizontal' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white hover:bg-slate-100 border-slate-200'}`}
               >
                 <Columns size={16}/> แนวนอน (3x5 ตาราง)
               </button>
@@ -286,7 +286,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
       {/* ตารางเลือกของและกำหนดจำนวนใบพิมพ์ */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8 no-print text-slate-800">
         <div className="xl:col-span-2 bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col max-h-[700px]">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+          <div className="flex flex-col sm:flex-row justifyContent-between items-start sm:items-center gap-4 mb-4">
             <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest ml-2">7. เลือกสินค้า & ใส่โควตาพิมพ์</h4>
             <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
@@ -342,13 +342,13 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         {/* หน้าต่างจำลองแผ่นป้ายสติ๊กเกอร์ดวงแรก (Live Preview) */}
         <div className="bg-slate-900 p-6 rounded-[2.5rem] text-white flex flex-col h-[700px] shadow-2xl">
           <h4 className="font-black text-sm uppercase text-blue-400 tracking-widest mb-4 flex items-center gap-2"><Info size={16}/> 8. จำลองสติ๊กเกอร์ดวงแรก (Live Preview)</h4>
-          <div className="flex-1 flex items-center justify-center bg-white/5 rounded-3xl p-4 overflow-auto">
+          <div className="flex-1 flex items-center justifyContent-center bg-white/5 rounded-3xl p-4 overflow-auto">
             {printCards.length > 0 ? (
-              <div className="bg-white text-slate-900 p-4 rounded-xl shadow-lg flex flex-col justify-between border border-slate-200 overflow-hidden shrink-0" style={{ width: `${frameWidth}cm`, height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
+              <div className="bg-white text-slate-900 p-4 rounded-xl shadow-lg flex flex-col justifyContent-between border border-slate-200 overflow-hidden shrink-0" style={{ width: `${frameWidth}cm`, height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
                 <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight truncate shrink-0" style={{ fontSize: `${fontSize + 2}px`, margin: '0 0 4px 0' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContentContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
                       <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
                       <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{printCards[0].prefix} : {printCards[0].name}</p>
@@ -361,17 +361,19 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                         </p>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContentContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                       <QRCodeCanvas value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span className="font-mono font-black tracking-widest mt-0.5 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm', width: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justify: 'center' }}>
-                      <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
-                      <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{printCards[0].prefix} : {printCards[0].name}</p>
-                      <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
+                  <div style={{ display: 'flex', flexDirection: 'row', justifyContentContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm', width: '100%' }}>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContentContent: 'center' }}>
+                    <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
+                    <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{printCards[0].prefix} : {printCards[0].name}</p>
+                    <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
+                                     
                       {printCards[0].showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
                       <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {printCards[0].received_date}</p>
                       {printCards[0].weight && (
@@ -380,7 +382,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                         </p>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <QRCodeCanvas value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span className="font-mono font-black tracking-widest mt-1 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
                     </div>
@@ -400,11 +402,11 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
             <div className="bg-white border shadow-inner p-[5mm] mx-auto" style={{ width: layoutMode === 'vertical' ? '210mm' : '297mm', minHeight: layoutMode === 'vertical' ? '297mm' : '210mm' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '4mm' }}>
                 {printCards.map((card, idx) => (
-                  <div key={idx} className="border border-slate-300 bg-white text-slate-900 p-3 rounded flex flex-col justify-between overflow-hidden shadow-sm" style={{ width: '100%', height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
+                  <div key={idx} className="border border-slate-300 bg-white text-slate-900 p-3 rounded flex flex-col justifyContent-between overflow-hidden shadow-sm" style={{ width: '100%', height: `${frameHeight}cm`, boxSizing: 'border-box' }}>
                     <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 3px 0' }} className="truncate">{companyName}</p>
                     
                     {layoutMode === 'vertical' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContentContent: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
                           <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.prefix} : {card.name}</p>
@@ -417,14 +419,14 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                             </p>
                           )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContentContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                           <QRCodeCanvas value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.22), width: Math.floor((qrSize-10)*0.22), excavate: true } : undefined} />
                           <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(8, fontSize - 4)}px`, letterSpacing: '0.05em', marginTop: '2px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                         </div>
                       </div>
                     ) : (
-                      <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '2mm' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
+                      <div style={{ display: 'flex', flexDirection: 'row', justifyContentContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '2mm' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContentContent: 'center' }}>
                           <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.prefix} : {card.name}</p>
                           <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
@@ -436,7 +438,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                             </p>
                           )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContentContent: 'center', flexShrink: 0 }}>
                           <QRCodeCanvas value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.22), width: Math.floor((qrSize-10)*0.22), excavate: true } : undefined} />
                           <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(8, fontSize - 4)}px`, letterSpacing: '0.05em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                         </div>
@@ -455,12 +457,12 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         {Array.from({ length: Math.ceil(printCards.length / itemsPerPage) }).map((_, pageIdx) => (
           <div key={pageIdx} className="sticker-page">
             {printCards.slice(pageIdx * itemsPerPage, (pageIdx + 1) * itemsPerPage).map((card, idx) => (
-              <div key={idx} className="sticker-card-print" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', backgroundColor: '#ffffff', overflow: 'hidden' }}>
+              <div key={idx} className="sticker-card-print" style={{ display: 'flex', flexDirection: 'column', justifyContentContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', backgroundColor: '#ffffff', overflow: 'hidden' }}>
                 
                 <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContentContent: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', width: '100%' }}>
                       <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{card.prefix} : {card.name}</p>
@@ -473,14 +475,14 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                         </p>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContentContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                       <QRCodeCanvas value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.1em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', justifyContentContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justifyContentContent: 'center' }}>
                       <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{card.prefix} : {card.name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
@@ -492,7 +494,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                         </p>
                       )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <QRCodeCanvas value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.1em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                     </div>
