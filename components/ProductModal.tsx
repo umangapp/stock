@@ -146,21 +146,6 @@ export default function ProductModal({
   />
 </div>
 
-{/* สต๊อกเริ่มต้น */}
-<div className="col-span-2 bg-blue-50 rounded-2xl p-4 border border-blue-100">
-  <label className="text-[10px] font-black uppercase text-blue-500 block mb-1 font-bold">สต๊อกเริ่มต้น</label>
-  <input 
-    type="number" 
-    required 
-    min="0" 
-    className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" 
-    value={productData.current_stock === 0 && productData._isStFocused ? '' : productData.current_stock} 
-    onChange={e => setProductData({...productData, current_stock: e.target.value === '' ? 0 : Number(e.target.value)})}
-    onFocus={() => setProductData({ ...productData, _isStFocused: true })} 
-    onBlur={() => setProductData({ ...productData, _isStFocused: false })} 
-  />
-</div>
-
             <div className="col-span-2 bg-blue-50 rounded-2xl p-4 border border-blue-100"><label className="text-[10px] font-black uppercase text-blue-500 block mb-1">สต๊อกเริ่มต้น</label>
               <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" 
                 value={productData.current_stock === 0 && productData._isStFocused ? '' : productData.current_stock} 
