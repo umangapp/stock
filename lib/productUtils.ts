@@ -20,7 +20,12 @@ export const formatToDateInput = (dateStr: string) => {
 export const formatFromDateInput = (dateStr: string) => {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  if (parts.length === 3) {
+    const year = parts[0].length === 4 ? parts[0].substring(2) : parts[0]; // 2026 -> 26
+    const month = parts[1].padStart(2, '0');                               // 08
+    const day = parts[2].padStart(2, '0');                                 // 12
+    return `${year}${month}${day}`;                                         // ได้ 260812
+  }
   return dateStr;
 };
 
