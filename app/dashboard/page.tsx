@@ -419,10 +419,12 @@ export default function AdminDashboard() {
 
                                       {expandedL3.includes(`${l1.name}-${l2.height}-${l3.lot}`) && (
                                          <div className="p-2 space-y-2 border-t border-slate-100 bg-slate-50/50">
-                                            {l3.items.map((item: any) => {
-                                              const isItemLow = item.current_stock <= (item.safety_stock || 0);
-                                              return (
-                                                <div key={item.id} className={`bg-white p-4 rounded-[1.5rem] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isItemLow ? 'border-red-300 shadow-sm shadow-red-100' : 'border-slate-100'}`}>
+                                            {l3.items
+                                               .sort((a: any, b: any) => (a.sku_15_digits || '').localeCompare(b.sku_15_digits || ''))
+                                               .map((item: any) => {
+                                                 const isItemLow = item.current_stock <= (item.safety_stock || 0);
+                                                 return (
+                                                 <div key={item.id} className={`bg-white p-4 rounded-[1.5rem] border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 ${isItemLow ? 'border-red-300 shadow-sm shadow-red-100' : 'border-slate-100'}`}>
                                                   <div className="flex-1">
                                                     <div className="mb-1"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
                                                     <div className="flex flex-wrap items-center gap-2 mt-2">
