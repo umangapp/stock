@@ -7,128 +7,14 @@ import * as XLSX from 'xlsx'
 import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
-  ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, X, FileSpreadsheet, Info, Zap, QrCode,
+  ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, FileSpreadsheet, Info, Zap, QrCode,
   Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
 
-// ฟังก์ชันแปลงค่าวันที่ให้เข้ากับ Input type="date"
-const formatToDateInput = (dateStr: string) => {
-  if (!dateStr) return '';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return dateStr;
-  
-  const parts = dateStr.split(/[\/\-]/);
-  if (parts.length === 3) {
-    if (parts[2].length === 4) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-    if (parts[0].length === 4) return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
-  }
-
-  if (/^\d{6}$/.test(dateStr)) {
-    const y = dateStr.substring(0, 2);
-    const m = dateStr.substring(2, 4);
-    const d = dateStr.substring(4, 6);
-    return `20${y}-${m}-${d}`;
-  }
-  return '';
-};
-
-const formatFromDateInput = (dateStr: string) => {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  return dateStr;
-};
-
-const parseDateToYYMMDD = (dateStr: string): string => {
-  if (!dateStr) return '';
-  const clean = dateStr.trim();
-  if (/^\d{6}$/.test(clean)) return clean;
-  const parts = clean.split(/[\/\-]/);
-  if (parts.length === 3) {
-    if (parts[0].length === 4) return `${parts[0].substring(2)}${parts[1].padStart(2, '0')}${parts[2].padStart(2, '0')}`;
-    let year = parts[2].trim();
-    if (year.length === 4) year = year.substring(2);
-    return `${year}${parts[1].padStart(2, '0')}${parts[0].padStart(2, '0')}`;
-  }
-  return clean.replace(/\D/g, '').substring(0, 6);
-};
-
-const parseExcelDate = (dateVal: any): string => {
-  if (!dateVal) return '';
-  if (dateVal instanceof Date) {
-    const year = String(dateVal.getFullYear()).substring(2);
-    const month = String(dateVal.getMonth() + 1).padStart(2, '0');
-    const day = String(dateVal.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
-  }
-  let dateStr = String(dateVal).trim();
-  if (dateStr.includes('GMT') || dateStr.includes('Z') || dateStr.length > 20) {
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      const year = String(d.getFullYear()).substring(2);
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}${month}${day}`;
-    }
-  }
-  if (dateStr.includes('/')) {
-    const parts = dateStr.split('/');
-    if (parts.length === 3) {
-      const day = parts[0].padStart(2, '0');
-      const month = parts[1].padStart(2, '0');
-      let year = parts[2].trim();
-      if (year.length === 4) { year = year.substring(2); }
-      return `${year}${month}${day}`;
-    }
-  }
-  if (dateStr.includes('-')) {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      let year = parts[0].trim();
-      const month = parts[1].padStart(2, '0');
-      const day = parts[2].padStart(2, '0');
-      if (year.length === 4) { year = year.substring(2); }
-      return `${year}${month}${day}`;
-    }
-  }
-  if (/^\d+$/.test(dateStr) && dateStr.length === 5) {
-    const serial = Number(dateStr);
-    const utc_days  = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400;                                        
-    const date_info = new Date(utc_value * 1000);
-    const year = String(date_info.getFullYear()).substring(2);
-    const month = String(date_info.getMonth() + 1).padStart(2, '0');
-    const day = String(date_info.getDate()).padStart(2, '0');
-    return `${year}${month}${day}`;
-  }
-  return dateStr;
-};
-
-const SKUColoredAdmin = ({ sku, prefix, isDark = false }: { sku: string; prefix: string; isDark?: boolean }) => {
-  if (!sku) return <span className="text-slate-500 italic text-sm">พิมพ์หรือประกอบรหัส...</span>;
-  const cleanSku = sku.trim();
-  const preLen = prefix?.length || 2;
-  const paddingMatch = cleanSku.match(/[xX]+$/);
-  const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
-  const coreLen = cleanSku.length - paddingLen;
-  if (coreLen < 8 + preLen) return <span className="font-mono font-black">{cleanSku}</span>;
-  const p1 = cleanSku.substring(0, preLen);
-  const p2 = cleanSku.substring(preLen, coreLen - 8); 
-  const p3 = cleanSku.substring(coreLen - 8, coreLen - 2); 
-  const p_num = cleanSku.substring(coreLen - 2, coreLen); 
-  const p4 = cleanSku.substring(coreLen); 
-  const colors = isDark 
-    ? { pre: "text-blue-400", dim: "text-green-400", lot: "text-orange-400", num: "text-pink-400", pad: "text-slate-500" } 
-    : { pre: "text-blue-600", dim: "text-green-600", lot: "text-orange-500", num: "text-pink-600", pad: "text-slate-400" };
-  return (
-    <span className="font-mono font-black tracking-[0.15em] uppercase italic tracking-normal text-lg sm:text-2xl break-all">
-      <span className={colors.pre}>{p1}</span>
-      <span className={colors.dim}>{p2}</span>
-      <span className={colors.lot}>{p3}</span>
-      <span className={colors.num}>{p_num}</span>
-      <span className={colors.pad}>{p4}</span>
-    </span>
-  );
-};
+// 🌟 Import Component และ Utilities ที่เราแยกไว้
+import { parseExcelDate, parseDateToYYMMDD, validateSKU } from '@/lib/productUtils'
+import SKUColoredAdmin from '@/components/SKUColored'
+import ProductModal from '@/components/ProductModal'
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -155,6 +41,7 @@ export default function AdminDashboard() {
   const [inputName, setInputName] = useState('')
   const [inputPrefix, setInputPrefix] = useState('')
   const [inputUnit, setInputUnit] = useState('')
+  
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -164,28 +51,6 @@ export default function AdminDashboard() {
     received_date: '', unit: '', current_stock: 0, safety_stock: 0, 
     running: '01', weight: '', sku_15_digits: '' 
   })
-
-  // 🌟 🤖 ปรับการสร้าง SKU: กว้าง/ยาว ดึงเฉพาะ 2 ตัวหน้า
-  const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
-    const pre = prefix || '';
-    const h = height !== '' && height !== null && height !== undefined ? String(height).replace(/\./g, '').trim() : '';
-    
-    const wRaw = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
-    const w = wRaw.substring(0, 2);
-    
-    const lRaw = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
-    const l = lRaw.substring(0, 2);
-    
-    const lot = parseDateToYYMMDD(dateStr);
-    const run = running ? String(running).padStart(2, '0').slice(-2) : '01';
-    
-    const generatedCore = `${pre}${h}${w}${l}${lot}${run}`.toUpperCase();
-    
-    const existingPadMatch = currentSKU.match(/[xX]+$/);
-    const existingPad = existingPadMatch ? existingPadMatch[0].toUpperCase() : '';
-    
-    return `${generatedCore}${existingPad}`;
-  };
 
   const checkAdminAccess = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -222,14 +87,6 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData() }, [])
 
-  const validateSKU = (sku: string) => {
-    if (!sku || sku.length < 8) return false;
-    const paddingMatch = sku.match(/[xX]+$/);
-    const coreSku = paddingMatch ? sku.slice(0, -paddingMatch[0].length) : sku;
-    const twoDigits = coreSku.slice(-2);
-    return /^\d{2}$/.test(twoDigits); 
-  }
-
   const handleUpdateUserName = async (id: string, newName: string) => {
     if (!newName.trim()) return;
     const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', id);
@@ -249,6 +106,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
+  // ฟังก์ชันนำเข้าไฟล์ Excel
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -350,46 +208,16 @@ export default function AdminDashboard() {
     reader.readAsArrayBuffer(file)
   }
 
-  const handleNameSelect = (name: string, isAdd: boolean) => {
-    const matched = masterProducts.find(m => m.name === name)
-    const newPrefix = matched ? matched.prefix : '';
-    if (isAdd) {
-      const updated = { ...newProduct, name, prefix: newPrefix };
-      const newSKU = buildSKUFromFields(newPrefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
-      setNewProduct({ ...updated, sku_15_digits: newSKU });
-    } else {
-      const updated = { ...editingProduct, name, prefix: newPrefix };
-      const newSKU = buildSKUFromFields(newPrefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
-      setEditingProduct({ ...updated, sku_15_digits: newSKU });
-    }
-  }
-
-  const updateProductAndSKU = (field: string, value: any, isAdd: boolean) => {
-    if (isAdd) {
-      const updated = { ...newProduct, [field]: value };
-      const newSKU = buildSKUFromFields(updated.prefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
-      setNewProduct({ ...updated, sku_15_digits: newSKU });
-    } else {
-      const updated = { ...editingProduct, [field]: value };
-      const newSKU = buildSKUFromFields(updated.prefix, updated.height, updated.width, updated.length, updated.received_date, updated.running, updated.sku_15_digits);
-      setEditingProduct({ ...updated, sku_15_digits: newSKU });
-    }
-  };
-
+  // ฟังก์ชันจัดการฟอร์มสินค้า
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     
     const dbPayload: any = {
-      name: newProduct.name,
-      prefix: newProduct.prefix,
-      height: Number(newProduct.height) || 0,
-      width: Number(newProduct.width) || 0,
-      length: Number(newProduct.length) || 0,
-      received_date: newProduct.received_date,
-      unit: newProduct.unit,
-      current_stock: Number(newProduct.current_stock) || 0,
-      safety_stock: Number(newProduct.safety_stock) || 0,
+      name: newProduct.name, prefix: newProduct.prefix, height: Number(newProduct.height) || 0,
+      width: Number(newProduct.width) || 0, length: Number(newProduct.length) || 0,
+      received_date: newProduct.received_date, unit: newProduct.unit,
+      current_stock: Number(newProduct.current_stock) || 0, safety_stock: Number(newProduct.safety_stock) || 0,
       sku_15_digits: newProduct.sku_15_digits
     }
 
@@ -398,16 +226,8 @@ export default function AdminDashboard() {
     }
 
     const { error } = await supabase.from('products').insert([dbPayload])
-    if (!error) { 
-      setIsAddModalOpen(false); 
-      fetchData(); 
-    } else { 
-      if (error.code === '23505') {
-        alert("❌ เกิดข้อผิดพลาด: รหัส SKU นี้มีอยู่ในระบบแล้วครับ");
-      } else {
-        alert(`❌ เกิดข้อผิดพลาดจากระบบ: ${error.message}`);
-      }
-    }
+    if (!error) { setIsAddModalOpen(false); fetchData(); } 
+    else { alert(error.code === '23505' ? "❌ รหัส SKU นี้มีอยู่ในระบบแล้วครับ" : `❌ ผิดพลาด: ${error.message}`); }
   }
 
   const handleUpdateProduct = async (e: React.FormEvent) => {
@@ -415,15 +235,10 @@ export default function AdminDashboard() {
     if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
     
     const dbPayload: any = {
-      name: editingProduct.name,
-      prefix: editingProduct.prefix,
-      height: Number(editingProduct.height) || 0,
-      width: Number(editingProduct.width) || 0,
-      length: Number(editingProduct.length) || 0,
-      received_date: editingProduct.received_date,
-      unit: editingProduct.unit,
-      current_stock: Number(editingProduct.current_stock) || 0,
-      safety_stock: Number(editingProduct.safety_stock) || 0,
+      name: editingProduct.name, prefix: editingProduct.prefix, height: Number(editingProduct.height) || 0,
+      width: Number(editingProduct.width) || 0, length: Number(editingProduct.length) || 0,
+      received_date: editingProduct.received_date, unit: editingProduct.unit,
+      current_stock: Number(editingProduct.current_stock) || 0, safety_stock: Number(editingProduct.safety_stock) || 0,
       sku_15_digits: editingProduct.sku_15_digits
     }
 
@@ -432,12 +247,8 @@ export default function AdminDashboard() {
     }
 
     const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
-    if (!error) { 
-      setIsEditModalOpen(false); 
-      fetchData(); 
-    } else {
-      alert(`❌ ไม่สามารถอัปเดตได้: ${error.message}`);
-    }
+    if (!error) { setIsEditModalOpen(false); fetchData(); } 
+    else { alert(`❌ ไม่สามารถอัปเดตได้: ${error.message}`); }
   }
 
   const deleteProduct = async (id: string) => {
@@ -447,6 +258,7 @@ export default function AdminDashboard() {
     else fetchData();
   }
 
+  // จัดกลุ่มข้อมูลเพื่อการแสดงผล
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
     const user = t.created_by || 'Unknown';
     if (!acc[user]) acc[user] = [];
@@ -459,7 +271,6 @@ export default function AdminDashboard() {
     .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.prefix.toLowerCase().includes(searchQuery.toLowerCase()))
     .reduce((acc: any, item: any) => {
       const isLowStock = item.current_stock <= (item.safety_stock || 0);
-
       if (!acc[item.name]) acc[item.name] = { name: item.name, prefix: item.prefix || 'XXX', totalStock: 0, unit: item.unit, hasLowStock: false, heights: {} };
       acc[item.name].totalStock += item.current_stock;
       if (isLowStock) acc[item.name].hasLowStock = true;
@@ -493,14 +304,8 @@ export default function AdminDashboard() {
             page-break-after: always !important; box-sizing: border-box !important; background-color: #ffffff !important;
           }
         }
-        input[type="date"]::-webkit-calendar-picker-indicator {
-          cursor: pointer;
-          opacity: 0.6;
-          transition: 0.2s;
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator:hover {
-          opacity: 1;
-        }
+        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: 0.2s; }
+        input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
       `}</style>
 
       <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
@@ -649,7 +454,7 @@ export default function AdminDashboard() {
                                          </div>
                                       )}
                                    </div>
-                                me))}
+                                ))}
                               </div>
                            )}
                         </div>
@@ -794,169 +599,18 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* MODALS */}
-      {(isAddModalOpen || isEditModalOpen) && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[100] flex items-center justify-center p-4 text-slate-800 no-print">
-          <div className="bg-white w-full max-w-3xl rounded-[3rem] shadow-2xl p-8 max-h-[90vh] overflow-y-auto text-slate-900">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-2xl font-black italic uppercase tracking-tighter leading-none">{isAddModalOpen ? 'เพิ่มสินค้าใหม่' : 'แก้ไขข้อมูล'}</h3>
-              <button onClick={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }} className="p-2 bg-slate-100 rounded-full text-slate-400"><X/></button>
-            </div>
-            
-            <form onSubmit={isAddModalOpen ? handleAddProduct : handleUpdateProduct} className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="col-span-full">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ชื่อสินค้าหลัก</label>
-                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border shadow-sm font-bold" value={isAddModalOpen ? newProduct.name : editingProduct.name} onChange={e => handleNameSelect(e.target.value, isAddModalOpen)}>
-                    <option value="">-- เลือกชื่อสินค้า --</option>
-                    {masterProducts.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-                  </select>
-                </div>
-                
-                {/* 🌟 🤖 กล่อง SKU สามารถคลิกพิมพ์แก้ไขรหัสแบบ Custom เองได้ทันที */}
-                <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
-                  <div className="flex justify-between items-center mb-2 px-2">
-                    <label className="text-[11px] font-black uppercase text-blue-400 block">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
-                    <span className="text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">✏️ คลิกพิมพ์แก้ไขได้</span>
-                  </div>
-                  
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex flex-col items-center justify-center shadow-inner gap-2 focus-within:border-blue-500/50 transition-all">
-                    <SKUColoredAdmin 
-                      sku={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
-                      prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
-                      isDark={true} 
-                    />
-                    
-                    <input 
-                      type="text" 
-                      maxLength={50} 
-                      className="w-full bg-transparent border-t border-white/10 pt-2 font-mono font-bold text-xs text-center text-blue-300 outline-none focus:text-white" 
-                      placeholder="พิมพ์เพื่อกำหนดรหัส SKU เองที่นี่..." 
-                      value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
-                      onChange={e => { 
-                        const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
-                        if (isAddModalOpen) setNewProduct({...newProduct, sku_15_digits: val}); 
-                        else setEditingProduct({...editingProduct, sku_15_digits: val}); 
-                      }} 
-                    />
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-3 px-2">
-                    <p className={`text-xs font-black uppercase tracking-wider ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'text-emerald-500' : 'text-red-500 animate-pulse'}`}>
-                      ความยาว: {((isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) || '').length} หลัก
-                    </p>
-                    <p className="text-[10px] text-slate-400 italic text-right">2 หลักท้ายสุด (หรือหน้าชุด X) ต้องเป็นตัวเลข</p>
-                  </div>
-                </div>
-                
-                <div className="col-span-2 md:col-span-1"><label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ตัวย่อ</label><input type="text" readOnly className="w-full bg-slate-200 p-4 rounded-2xl font-black text-blue-600 text-center" value={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} /></div>
-                
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หนา</label>
-                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
-                    value={isAddModalOpen ? newProduct.height : editingProduct.height} 
-                    onChange={e => updateProductAndSKU('height', e.target.value, isAddModalOpen)} 
-                  />
-                </div>
-                
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">กว้าง</label>
-                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
-                    value={isAddModalOpen ? newProduct.width : editingProduct.width} 
-                    onChange={e => updateProductAndSKU('width', e.target.value, isAddModalOpen)} 
-                  />
-                </div>
-                
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">ยาว</label>
-                  <input type="number" required step="any" className="w-full bg-slate-50 p-4 rounded-2xl border font-black shadow-sm" 
-                    value={isAddModalOpen ? newProduct.length : editingProduct.length} 
-                    onChange={e => updateProductAndSKU('length', e.target.value, isAddModalOpen)} 
-                  />
-                </div>
-                
-                <div className="col-span-2 md:col-span-2 relative">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">วันที่รับ (Lot Date)</label>
-                  <input 
-                    type="date" 
-                    required 
-                    className="w-full bg-slate-50 p-4 rounded-2xl border font-black text-center shadow-sm text-slate-700 uppercase outline-none focus:border-blue-500 cursor-pointer" 
-                    value={formatToDateInput(isAddModalOpen ? newProduct.received_date : editingProduct.received_date)} 
-                    onChange={e => updateProductAndSKU('received_date', formatFromDateInput(e.target.value), isAddModalOpen)} 
-                  />
-                </div>
-
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-[10px] font-black uppercase text-blue-600 ml-2 font-bold">Running (2 หลัก)</label>
-                  <input type="text" required maxLength={2} className="w-full bg-blue-50/60 p-4 rounded-2xl border border-blue-200 font-black text-blue-700 text-center" placeholder="01" 
-                    value={isAddModalOpen ? newProduct.running : (editingProduct.running || '01')} 
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      updateProductAndSKU('running', val, isAddModalOpen);
-                    }} 
-                  />
-                </div>
-
-                <div className="col-span-2 md:col-span-1">
-                  <label className="text-[10px] font-black uppercase text-slate-400 ml-2 font-bold">หน่วยนับ</label>
-                  <select required className="w-full bg-slate-50 p-4 rounded-2xl border font-bold" 
-                    value={isAddModalOpen ? newProduct.unit : editingProduct.unit} 
-                    onChange={e => isAddModalOpen ? setNewProduct({...newProduct, unit: e.target.value}) : setEditingProduct({...editingProduct, unit: e.target.value})}
-                  >
-                    <option value="">-- เลือกหน่วยนับ --</option>
-                    {masterUnits.map(m => <option key={m.id} value={m.unit}>{m.unit}</option>)}
-                  </select>
-                </div>
-
-                {/* ช่องน้ำหนัก (รองรับทศนิยม 2 ตำแหน่ง) */}
-                {(isAddModalOpen ? newProduct.unit : editingProduct.unit)?.includes('กก') && (
-                  <div className="col-span-2 md:col-span-1 animate-in fade-in">
-                    <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (กก. - ทศนิยม 2 ตำแหน่ง)</label>
-                    <input 
-                      type="number" 
-                      step="0.01" 
-                      min="0.01" 
-                      max="999" 
-                      className="w-full bg-amber-50/60 p-4 rounded-2xl border border-amber-300 font-black text-amber-700 text-center outline-none focus:border-amber-500 shadow-sm" 
-                      placeholder="เช่น 50.25" 
-                      value={isAddModalOpen ? newProduct.weight : (editingProduct.weight || '')} 
-                      onChange={e => {
-                        const val = e.target.value;
-                        if (isAddModalOpen) setNewProduct({ ...newProduct, weight: val });
-                        else setEditingProduct({ ...editingProduct, weight: val });
-                      }} 
-                    />
-                  </div>
-                )}
-                
-                <div className="col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100">
-                  <label className="text-[10px] font-black uppercase text-red-500 block mb-1">Safety Stock (จุดแจ้งเตือน)</label>
-                  <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-red-600 outline-none" 
-                    value={isAddModalOpen ? (newProduct.safety_stock === 0 && (newProduct as any)._isSfFocused ? '' : newProduct.safety_stock) : (editingProduct.safety_stock === 0 && (editingProduct as any)._isSfFocused ? '' : editingProduct.safety_stock)} 
-                    onChange={e => { const val = e.target.value === '' ? 0 : Number(e.target.value); if (isAddModalOpen) setNewProduct({...newProduct, safety_stock: val}); else setEditingProduct({...editingProduct, safety_stock: val}); }}
-                    onFocus={() => { if (isAddModalOpen) setNewProduct({ ...newProduct, _isSfFocused: true } as any); else setEditingProduct({ ...editingProduct, _isSfFocused: true } as any); }}
-                    onBlur={() => { if (isAddModalOpen) setNewProduct({ ...newProduct, _isSfFocused: false } as any); else setEditingProduct({ ...editingProduct, _isSfFocused: false } as any); }}
-                  />
-                </div>
-
-                <div className="col-span-2 bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                  <label className="text-[10px] font-black uppercase text-blue-500 block mb-1">สต๊อกเริ่มต้น</label>
-                  <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" 
-                    value={isAddModalOpen ? (newProduct.current_stock === 0 && (newProduct as any)._isStFocused ? '' : newProduct.current_stock) : (editingProduct.current_stock === 0 && (editingProduct as any)._isStFocused ? '' : editingProduct.current_stock)} 
-                    onChange={e => { const val = e.target.value === '' ? 0 : Number(e.target.value); if (isAddModalOpen) setNewProduct({...newProduct, current_stock: val}); else setEditingProduct({...editingProduct, current_stock: val}); }}
-                    onFocus={() => { if (isAddModalOpen) setNewProduct({ ...newProduct, _isStFocused: true } as any); else setEditingProduct({ ...editingProduct, _isStFocused: true } as any); }}
-                    onBlur={() => { if (isAddModalOpen) setNewProduct({ ...newProduct, _isStFocused: false } as any); else setEditingProduct({ ...editingProduct, _isStFocused: false } as any); }}
-                  />
-                </div>
-              </div>
-              
-              <button type="submit" disabled={!validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits)} className={`w-full py-6 rounded-3xl font-black text-xl uppercase italic shadow-xl transition-all ${validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'bg-blue-600 text-white active:scale-95' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                {validateSKU(isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits) ? 'บันทึกข้อมูลสินค้า' : '❌ รหัส SKU ไม่ถูกต้องตามโครงสร้าง'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* 🌟 🤖 เรียกใช้ Product Modal ที่เราแยกไฟล์ออกมา */}
+      <ProductModal 
+        isOpen={isAddModalOpen || isEditModalOpen}
+        isEditModal={isEditModalOpen}
+        onClose={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }}
+        onSubmit={isAddModalOpen ? handleAddProduct : handleUpdateProduct}
+        productData={isAddModalOpen ? newProduct : editingProduct}
+        setProductData={isAddModalOpen ? setNewProduct : setEditingProduct}
+        masterProducts={masterProducts}
+        masterUnits={masterUnits}
+      />
+      
     </div>
   )
 }
