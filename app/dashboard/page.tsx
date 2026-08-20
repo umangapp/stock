@@ -266,10 +266,15 @@ export default function AdminDashboard() {
           const formattedDate = parseExcelDate(row[3]);
           const prefix = String(row[1] || 'XXX').trim().toUpperCase();
           const runningVal = String(row[4] || '01').padStart(2, '0').slice(-2);
+          const unitVal = String(row[5] || '').trim();
           
-          let manualSku = String(row[7] || '').trim().toUpperCase(); // คอลัมน์ H (SKU)
+          // คอลัมน์ G (น้ำหนัก)
+          const weightVal = row[6] !== undefined && row[6] !== '' && row[6] !== null ? parseFloat(Number(row[6]).toFixed(2)) : null;
           
-          // 🌟 🤖 ถ้าเว้นว่างช่อง SKU ไว้ ให้ระบบสร้างให้อัตโนมัติจากสูตรทันที
+          // คอลัมน์ I (SKU)
+          let manualSku = String(row[8] || '').trim().toUpperCase(); 
+          
+          // สั่ง Auto-Gen SKU ทันทีหากเว้นว่างช่อง SKU ไว้
           if (!manualSku) {
             const hClean = hVal.replace(/\./g, '');
             const wClean = wVal.replace(/\./g, '');
@@ -279,7 +284,6 @@ export default function AdminDashboard() {
             manualSku = `${prefix}${hClean}${wClean}${lClean}${lotFormatted}${runningVal}`;
           }
 
-          // ตรวจสอบความถูกต้องของ SKU
           if (manualSku.length < 8) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${row[0]}" รหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
@@ -298,10 +302,11 @@ export default function AdminDashboard() {
             width: wVal ? parseFloat(wVal) : 0, 
             length: lVal ? parseFloat(lVal) : 0, 
             received_date: formattedDate, 
-            unit: String(row[5] || '').trim(), 
-            current_stock: Number(row[6] || 0), 
+            unit: unitVal, 
+            weight: unitVal.includes('กก') ? weightVal : null,
+            current_stock: Number(row[7] || 0), // คอลัมน์ H
             sku_15_digits: manualSku,
-            safety_stock: Number(row[8] || 0) 
+            safety_stock: Number(row[9] || 0) // คอลัมน์ J
           }
         }).filter(Boolean)
         
