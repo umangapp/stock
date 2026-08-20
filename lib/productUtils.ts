@@ -94,14 +94,22 @@ export const parseExcelDate = (dateVal: any): string => {
   return dateStr;
 };
 
-// 🌟 สูตรสร้างรหัส SKU ของเรา
+// 🌟 สูตรสร้างรหัส SKU จากช่องต่างๆ
 export const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
   const pre = prefix || '';
-  const h = height !== '' && height !== null && height !== undefined ? String(height).replace(/\./g, '').trim() : '';
-  const wRaw = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
-  const w = wRaw.substring(0, 2);
-  const lRaw = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
-  const l = lRaw.substring(0, 2);
+
+  // ฟังก์ชันช่วยแปลงค่าขนาด (ถ้าใส่ 0 หรือเว้นว่างไว้ จะส่งค่าเป็น '')
+  const processDimension = (val: any, maxLen?: number) => {
+    if (val === '' || val === null || val === undefined) return '';
+    if (Number(val) === 0) return ''; // 👈 ถ้าค่าเป็น 0 ไม่ต้องใส่ลงใน SKU
+    const cleaned = String(val).replace(/\./g, '').trim();
+    if (cleaned === '0') return '';
+    return maxLen ? cleaned.substring(0, maxLen) : cleaned;
+  };
+
+  const h = processDimension(height);
+  const w = processDimension(width, 2);
+  const l = processDimension(length, 2);
   
   const lot = parseDateToYYMMDD(dateStr);
   const run = running ? String(running).padStart(2, '0').slice(-2) : '01';
