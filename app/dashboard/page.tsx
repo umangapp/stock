@@ -52,7 +52,6 @@ const parseDateToYYMMDD = (dateStr: string): string => {
   return clean.replace(/\D/g, '').substring(0, 6);
 };
 
-// 🌟 🤖 อัปเดตฟังก์ชันแปลงวันที่จาก Excel ให้รองรับทุกฟอร์แมตครอบจักรวาล
 const parseExcelDate = (dateVal: any): string => {
   if (!dateVal) return '';
   if (dateVal instanceof Date) {
@@ -166,16 +165,25 @@ export default function AdminDashboard() {
     running: '01', weight: '', sku_15_digits: '' 
   })
 
+  // 🌟 🤖 ปรับการสร้าง SKU: กว้าง/ยาว ดึงเฉพาะ 2 ตัวหน้า
   const buildSKUFromFields = (prefix: string, height: any, width: any, length: any, dateStr: string, running: string, currentSKU: string = '') => {
     const pre = prefix || '';
     const h = height !== '' && height !== null && height !== undefined ? String(height).replace(/\./g, '').trim() : '';
-    const w = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
-    const l = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
+    
+    const wRaw = width !== '' && width !== null && width !== undefined ? String(width).replace(/\./g, '').trim() : '';
+    const w = wRaw.substring(0, 2);
+    
+    const lRaw = length !== '' && length !== null && length !== undefined ? String(length).replace(/\./g, '').trim() : '';
+    const l = lRaw.substring(0, 2);
+    
     const lot = parseDateToYYMMDD(dateStr);
     const run = running ? String(running).padStart(2, '0').slice(-2) : '01';
+    
     const generatedCore = `${pre}${h}${w}${l}${lot}${run}`.toUpperCase();
+    
     const existingPadMatch = currentSKU.match(/[xX]+$/);
     const existingPad = existingPadMatch ? existingPadMatch[0].toUpperCase() : '';
+    
     return `${generatedCore}${existingPad}`;
   };
 
@@ -272,24 +280,33 @@ export default function AdminDashboard() {
           const runningVal = String(row[4] || '01').padStart(2, '0').slice(-2); 
           const unitVal = String(row[5] || '').trim(); 
           
-          const weightVal = row[6] !== undefined && row[6] !== '' && row[6] !== null ? parseFloat(Number(row[6]).toFixed(2)) : null;
+          const colHSku = String(row[7] || '').trim().toUpperCase(); 
+          const colISku = String(row[8] || '').trim().toUpperCase(); 
           
-          let manualSku = String(row[8] || '').trim().toUpperCase(); 
-          
-          // 🌟 🤖 อัปเดต Auto-Gen ให้เติมตัว X ป้องกันปัญหารหัสสั้นเกิน
+          let weightVal = null;
+          let currentStock = 0;
+          let manualSku = '';
+          let safetyStock = 0;
+
+          if (colHSku.length >= 8) {
+            currentStock = Number(row[6] || 0); 
+            manualSku = colHSku;               
+            safetyStock = Number(row[8] || 0); 
+          } else {
+            weightVal = row[6] !== undefined && row[6] !== '' && row[6] !== null ? parseFloat(Number(row[6]).toFixed(2)) : null;
+            currentStock = Number(row[7] || 0); 
+            manualSku = colISku;               
+            safetyStock = Number(row[9] || 0); 
+          }
+
           if (!manualSku) {
             const hClean = hVal.replace(/\./g, '');
-            const wClean = wVal.replace(/\./g, '');
-            const lClean = lVal.replace(/\./g, '');
+            const wClean = wVal.replace(/\./g, '').substring(0, 2);
+            const lClean = lVal.replace(/\./g, '').substring(0, 2);
             const lotFormatted = parseDateToYYMMDD(formattedDate);
             
             let coreSku = `${prefix}${hClean}${wClean}${lClean}${lotFormatted}`;
-            
-            // ถ้ารหัสสั้นไป ให้เติม X คั่นกลางจนกว่าจะพอดี
-            if (coreSku.length < 6) {
-               coreSku = coreSku.padEnd(6, 'X');
-            }
-            
+            if (coreSku.length < 6) coreSku = coreSku.padEnd(6, 'X');
             manualSku = `${coreSku}${runningVal}`;
           }
 
@@ -313,9 +330,9 @@ export default function AdminDashboard() {
             received_date: formattedDate, 
             unit: unitVal, 
             weight: unitVal.includes('กก') ? weightVal : null,
-            current_stock: Number(row[7] || 0), 
+            current_stock: currentStock, 
             sku_15_digits: manualSku,
-            safety_stock: Number(row[9] || 0) 
+            safety_stock: safetyStock 
           }
         }).filter(Boolean)
         
@@ -632,7 +649,7 @@ export default function AdminDashboard() {
                                          </div>
                                       )}
                                    </div>
-                                ))}
+                                me))}
                               </div>
                            )}
                         </div>
@@ -796,10 +813,14 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 
+                {/* 🌟 🤖 กล่อง SKU สามารถคลิกพิมพ์แก้ไขรหัสแบบ Custom เองได้ทันที */}
                 <div className="col-span-full bg-slate-900 p-5 rounded-3xl border border-white/5 text-white">
-                  <label className="text-[11px] font-black uppercase text-blue-400 ml-2 block mb-2">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
+                  <div className="flex justify-between items-center mb-2 px-2">
+                    <label className="text-[11px] font-black uppercase text-blue-400 block">รหัส SKU คิวอาร์โค้ด (ประกอบสูตรให้อัตโนมัติ)</label>
+                    <span className="text-[10px] text-amber-400 font-bold bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20">✏️ คลิกพิมพ์แก้ไขได้</span>
+                  </div>
                   
-                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex flex-col items-center justify-center shadow-inner gap-2">
+                  <div className="bg-white/5 border border-white/10 p-4 rounded-2xl text-center min-h-[64px] flex flex-col items-center justify-center shadow-inner gap-2 focus-within:border-blue-500/50 transition-all">
                     <SKUColoredAdmin 
                       sku={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
                       prefix={isAddModalOpen ? newProduct.prefix : editingProduct.prefix} 
@@ -809,8 +830,8 @@ export default function AdminDashboard() {
                     <input 
                       type="text" 
                       maxLength={50} 
-                      className="w-full bg-transparent border-t border-white/10 pt-2 font-mono font-bold text-xs text-center text-slate-400 outline-none focus:text-white" 
-                      placeholder="พิมพ์เพื่อแก้ไขรหัส หรือเติมตัว X ท้ายสุด..." 
+                      className="w-full bg-transparent border-t border-white/10 pt-2 font-mono font-bold text-xs text-center text-blue-300 outline-none focus:text-white" 
+                      placeholder="พิมพ์เพื่อกำหนดรหัส SKU เองที่นี่..." 
                       value={isAddModalOpen ? newProduct.sku_15_digits : editingProduct.sku_15_digits} 
                       onChange={e => { 
                         const val = e.target.value.replace(/\s+/g, '').toUpperCase(); 
@@ -887,7 +908,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
 
-                {/* 🌟 🤖 ช่องน้ำหนัก (รองรับทศนิยม 2 ตำแหน่ง) */}
+                {/* ช่องน้ำหนัก (รองรับทศนิยม 2 ตำแหน่ง) */}
                 {(isAddModalOpen ? newProduct.unit : editingProduct.unit)?.includes('กก') && (
                   <div className="col-span-2 md:col-span-1 animate-in fade-in">
                     <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (กก. - ทศนิยม 2 ตำแหน่ง)</label>
