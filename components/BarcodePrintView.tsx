@@ -14,11 +14,21 @@ interface Product {
   unit: string
   current_stock: number
   sku_15_digits: string
+  weight?: number | string | null
 }
 
 interface BarcodePrintViewProps {
   products: Product[]
 }
+
+// 🌟 ฟังก์ชันดึงเลข Running (2 หลักท้ายสุดของ Core SKU)
+const getRunningFromSku = (sku: string) => {
+  if (!sku) return '01';
+  const clean = sku.trim();
+  const match = clean.match(/[xX]+$/);
+  const core = match ? clean.slice(0, -match[0].length) : clean;
+  return core.length >= 2 ? core.slice(-2) : '01';
+};
 
 export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const logoInputRef = useRef<HTMLInputElement>(null)
@@ -110,12 +120,18 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
   const getFlattenedPrintCards = () => {
     const cards: any[] = []
     products.forEach(item => {
-      const setting = itemSettings[item.id] || { checked: false, copies: 1, packNo: '', labelAmount: 1, showAmount: false }
+      const runningNo = getRunningFromSku(item.sku_15_digits);
+      const defaultPackNo = item.weight ? runningNo : '';
+      const setting = itemSettings[item.id] || { checked: false, copies: 1, packNo: defaultPackNo, labelAmount: 1, showAmount: false }
+      
       if (setting.checked && setting.copies > 0) {
+        // 🌟 ถ้าสินค้ามีน้ำหนัก และไม่ได้พิมพ์ Pack No เอง ให้สลับไปใช้เลข Running อัตโนมัติ
+        const finalPackNo = setting.packNo !== '' && setting.packNo !== undefined ? setting.packNo : (item.weight ? runningNo : '-');
+        
         for (let i = 0; i < setting.copies; i++) {
           cards.push({
             ...item,
-            packNo: setting.packNo || '-',
+            packNo: finalPackNo,
             labelAmount: setting.labelAmount ?? 1,
             showAmount: setting.showAmount
           })
@@ -282,14 +298,20 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
           
           <div className="space-y-3 overflow-y-auto flex-1 pr-2">
             {filteredProducts.map(item => {
-              const state = itemSettings[item.id] || { checked: false, copies: 1, packNo: '', labelAmount: 1, showAmount: false };
+              const runningNo = getRunningFromSku(item.sku_15_digits);
+              const defaultPackNo = item.weight ? runningNo : '';
+              const state = itemSettings[item.id] || { checked: false, copies: 1, packNo: defaultPackNo, labelAmount: 1, showAmount: false };
+              const currentPackNo = state.packNo !== undefined && state.packNo !== '' ? state.packNo : defaultPackNo;
+
               return (
                 <div key={item.id} className={`p-4 rounded-2xl border transition-all flex flex-col lg:flex-row items-start lg:items-center gap-4 ${state.checked ? 'bg-blue-50/40 border-blue-400 shadow-sm' : 'bg-slate-50/50 border-slate-100'}`}>
                   <div className="flex items-center gap-3 w-full lg:w-auto">
                     <input type="checkbox" className="w-5 h-5 rounded cursor-pointer accent-blue-600 shrink-0" checked={state.checked} onChange={e => updateItemSetting(item.id, 'checked', e.target.checked)} />
                     <div className="min-w-0 flex-1 lg:w-56">
                       <p className="font-black text-sm uppercase text-slate-900 truncate">{item.prefix}: {item.name}</p>
-                      <p className="text-[10px] font-bold text-slate-400 italic">ขนาด: {item.height}x{item.width}x{item.length} มม. | SKU: {item.sku_15_digits}</p>
+                      <p className="text-[10px] font-bold text-slate-400 italic">
+                        ขนาด: {item.height}x{item.width}x{item.length} มม. {item.weight ? `| น้ำหนัก: ${Number(item.weight).toLocaleString('en-US', {minimumFractionDigits:2})} กก.` : ''} | SKU: {item.sku_15_digits}
+                      </p>
                     </div>
                   </div>
                   
@@ -300,7 +322,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                     </div>
                     <div>
                       <span className="text-[9px] text-slate-400 block font-black uppercase mb-1">Pack No.</span>
-                      <input type="text" className="w-20 bg-white border p-2 h-[38px] rounded-xl text-xs font-bold text-center" placeholder="เช่น P-01" value={state.packNo} onChange={e => updateItemSetting(item.id, 'packNo', e.target.value)} />
+                      <input type="text" className="w-20 bg-white border p-2 h-[38px] rounded-xl text-xs font-bold text-center" placeholder={item.weight ? runningNo : "เช่น P-01"} value={currentPackNo} onChange={e => updateItemSetting(item.id, 'packNo', e.target.value)} />
                     </div>
                     {state.showAmount && (
                       <div>
@@ -328,31 +350,41 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                 <p className="text-center font-black border-b pb-1 text-blue-600 uppercase tracking-tight truncate shrink-0" style={{ fontSize: `${fontSize + 2}px`, margin: '0 0 4px 0' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justify: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
-                      <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
-                      {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้าพรีวิว Live Preview แนวตั้ง */}
+                      <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
                       <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{printCards[0].prefix} : {printCards[0].name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
                       {printCards[0].showAmount && <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {printCards[0].received_date}</p>
+                      {/* 🌟 แสดงค่าน้ำหนักใต้ Lot Date ตัวใหญ่ๆ */}
+                      {printCards[0].weight && (
+                        <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(printCards[0].weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                        </p>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                       <QRCodeCanvas value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span className="font-mono font-black tracking-widest mt-0.5 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
                     </div>
                   </div>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm', width: '100%' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
-                      <p style={{ marginTop: '8px', marginBottom: '8px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
-                      {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้าพรีวิว Live Preview แนวนอน */}
+                    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justify: 'center' }}>
+                      <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {printCards[0].packNo}</p>
                       <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{printCards[0].prefix} : {printCards[0].name}</p>
                       <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {printCards[0].height}x{printCards[0].width}x{printCards[0].length}</p>
                       {printCards[0].showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {printCards[0].labelAmount} {printCards[0].unit}</p>}
                       <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {printCards[0].received_date}</p>
+                      {/* 🌟 แสดงค่าน้ำหนักใต้ Lot Date ตัวใหญ่ๆ */}
+                      {printCards[0].weight && (
+                        <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(printCards[0].weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                        </p>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
                       <QRCodeCanvas value={printCards[0].sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span className="font-mono font-black tracking-widest mt-1 text-slate-700" style={{ fontSize: `${Math.max(9, fontSize - 3)}px`, whiteSpace: 'nowrap' }}>{printCards[0].sku_15_digits}</span>
                     </div>
@@ -364,7 +396,7 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       </div>
 
-      {/* หน้าจอพรีวิวบนแอป ปรับเป็นระบบ CSS Grid 3 คอลัมน์ ล็อกตามการตั้งค่าเป๊ะ ๆ */}
+      {/* หน้าจอพรีวิวบนแอป */}
       {printCards.length > 0 && (
         <div className="no-print bg-white border border-slate-200 p-6 rounded-[2.5rem] shadow-sm">
           <h4 className="font-black text-sm uppercase text-slate-400 tracking-widest mb-4 ml-2">🖨️ 9. ตัวอย่างจัดหน้ากระดาษ A4 ({layoutMode === 'vertical' ? '3x3' : '3x5'} Layout)</h4>
@@ -376,31 +408,39 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
                     <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '2px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 3px 0' }} className="truncate">{companyName}</p>
                     
                     {layoutMode === 'vertical' ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justify: 'space-between', width: '100%' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', width: '100%' }}>
                           <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
-                          {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้าจัดหน้ากระดาษแนวตั้ง */}
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.prefix} : {card.name}</p>
                           <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                           {card.showAmount && <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
                           <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                          {card.weight && (
+                            <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                              <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(card.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                            </p>
+                          )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                           <QRCodeCanvas value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.22), width: Math.floor((qrSize-10)*0.22), excavate: true } : undefined} />
                           <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(8, fontSize - 4)}px`, letterSpacing: '0.05em', marginTop: '2px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                         </div>
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '2mm' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justifyContent: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0, fontSize: `${fontSize}px`, fontWeight: 'bold', color: '#000000', justify: 'center' }}>
                           <p style={{ marginTop: '4px', marginBottom: '4px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
-                          {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้าจัดหน้ากระดาษแนวนอน */}
                           <p style={{ margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{card.prefix} : {card.name}</p>
                           <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                           {card.showAmount && <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
                           <p style={{ margin: 0, whiteSpace: 'nowrap' }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                          {card.weight && (
+                            <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                              <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(card.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                            </p>
+                          )}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
                           <QRCodeCanvas value={card.sku_15_digits} size={qrSize - 10} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor((qrSize-10)*0.22), width: Math.floor((qrSize-10)*0.22), excavate: true } : undefined} />
                           <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(8, fontSize - 4)}px`, letterSpacing: '0.05em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                         </div>
@@ -414,41 +454,49 @@ export default function BarcodePrintView({ products }: BarcodePrintViewProps) {
         </div>
       )}
 
-      {/* 🔒 🖨️ โครงสร้างสำหรับพิมพ์ลงกระดาษจริง ปรับใช้ระบบคำนวณแบ่งแผ่นตามโควตาแนวตั้ง (9 ดวง) / แนวนอน (15 ดวง) */}
+      {/* โครงสร้างสำหรับพิมพ์ลงกระดาษจริง */}
       <div className="print-area hidden">
         {Array.from({ length: Math.ceil(printCards.length / itemsPerPage) }).map((_, pageIdx) => (
           <div key={pageIdx} className="sticker-page">
             {printCards.slice(pageIdx * itemsPerPage, (pageIdx + 1) * itemsPerPage).map((card, idx) => (
-              <div key={idx} className="sticker-card-print" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', backgroundColor: '#ffffff', overflow: 'hidden' }}>
+              <div key={idx} className="sticker-card-print" style={{ display: 'flex', flexDirection: 'column', justify: 'space-between', border: '1px solid #94a3b8', padding: '4mm', borderRadius: '6px', backgroundColor: '#ffffff', overflow: 'hidden' }}>
                 
                 <p style={{ textAlign: 'center', fontWeight: '900', borderBottom: '1px solid #cbd5e1', paddingBottom: '4px', color: '#2563eb', textTransform: 'uppercase', fontSize: `${fontSize + 1}px`, margin: '0 0 4px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{companyName}</p>
                 
                 {layoutMode === 'vertical' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justifyContent: 'space-between', width: '100%' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, justify: 'space-between', width: '100%' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', width: '100%' }}>
                       <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
-                      {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้ากระดาษพิมพ์จริงแนวตั้ง */}
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{card.prefix} : {card.name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                       {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                      {card.weight && (
+                        <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(card.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                        </p>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', marginTop: 'auto', flexShrink: 0, width: '100%' }}>
                       <QRCodeCanvas value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.1em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                     </div>
                   </div>
                 ) : (
-                  <div style={{ display: 'flex', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justifyContent: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'row', justify: 'space-between', alignItems: 'center', flex: 1, minHeight: 0, gap: '3mm' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: `${fontSize}px`, fontWeight: 'bold', lineHeight: '1.3', color: '#000000', flex: 1, minWidth: 0, justify: 'center' }}>
                       <p style={{ marginTop: '6px', marginBottom: '6px', marginLeft: 0, marginRight: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Pack No. :</span> {card.packNo}</p>
-                      {/* 🌟 จุดลบคำว่า "ตัวย่อ :" ออกไปจากหน้ากระดาษพิมพ์จริงแนวนอน */}
                       <p style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{card.prefix} : {card.name}</p>
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>ขนาด :</span> {card.height}x{card.width}x{card.length}</p>
                       {card.showAmount && <p style={{ color: '#000000', margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>จำนวน :</span> {card.labelAmount} {card.unit}</p>}
                       <p style={{ margin: 0 }}><span style={{ color: '#64748b', fontWeight: '900' }}>Lot Date :</span> {card.received_date}</p>
+                      {card.weight && (
+                        <p style={{ margin: '2px 0 0 0', fontSize: `${fontSize + 2}px`, fontWeight: '900', color: '#000000', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#64748b', fontWeight: '900' }}>น้ำหนัก :</span> {Number(card.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
+                        </p>
+                      )}
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justify: 'center', flexShrink: 0 }}>
                       <QRCodeCanvas value={card.sku_15_digits} size={qrSize} level="H" imageSettings={logoUrl ? { src: logoUrl, height: Math.floor(qrSize*0.22), width: Math.floor(qrSize*0.22), excavate: true } : undefined} />
                       <span style={{ fontFamily: 'monospace', fontWeight: '900', fontSize: `${Math.max(9, fontSize - 3)}px`, letterSpacing: '0.1em', marginTop: '3px', color: '#000000', whiteSpace: 'nowrap' }}>{card.sku_15_digits}</span>
                     </div>
