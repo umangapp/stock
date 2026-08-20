@@ -114,19 +114,21 @@ export default function ProductModal({
               </select>
             </div>
 
-            {productData.unit?.includes('กก') && (
-              <div className="col-span-2 md:col-span-1 animate-in fade-in"><label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (กก.)</label>
-                <input type="number" step="0.01" min="0.01" max="999" className="w-full bg-amber-50/60 p-4 rounded-2xl border border-amber-300 font-black text-amber-700 text-center outline-none focus:border-amber-500 shadow-sm" 
-                  value={productData.weight || ''} onChange={e => setProductData({ ...productData, weight: e.target.value })} />
-              </div>
-            )}
-            
-            <div className="col-span-2 bg-red-50 rounded-2xl p-4 border border-red-100"><label className="text-[10px] font-black uppercase text-red-500 block mb-1">Safety Stock</label>
-              <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-red-600 outline-none" 
-                value={productData.safety_stock === 0 && productData._isSfFocused ? '' : productData.safety_stock} 
-                onChange={e => setProductData({...productData, safety_stock: e.target.value === '' ? 0 : Number(e.target.value)})}
-                onFocus={() => setProductData({ ...productData, _isSfFocused: true })} onBlur={() => setProductData({ ...productData, _isSfFocused: false })} />
-            </div>
+{productData.unit?.includes('กก') && (
+  <div className="col-span-2 md:col-span-1 animate-in fade-in">
+    <label className="text-[10px] font-black uppercase text-amber-600 ml-2 font-bold">น้ำหนัก (กก.)</label>
+    <input 
+      type="number" 
+      step="0.01" 
+      min="0.01" 
+      max="9999" 
+      className="w-full bg-amber-50/60 p-4 rounded-2xl border border-amber-300 font-black text-amber-700 text-center outline-none focus:border-amber-500 shadow-sm" 
+      placeholder="เช่น 1000.35" 
+      value={productData.weight || ''} 
+      onChange={e => setProductData({ ...productData, weight: e.target.value })} 
+    />
+  </div>
+)}
 
             <div className="col-span-2 bg-blue-50 rounded-2xl p-4 border border-blue-100"><label className="text-[10px] font-black uppercase text-blue-500 block mb-1">สต๊อกเริ่มต้น</label>
               <input type="number" required min="0" className="w-full bg-transparent font-black text-2xl text-blue-600 outline-none" 
