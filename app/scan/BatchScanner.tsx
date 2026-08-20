@@ -32,7 +32,6 @@ const playErrorSound = () => {
   } catch (e) { console.error("Sound play error", e); }
 };
 
-// 🌟 🤖 อัปเดตฟังก์ชันสีหน้าระบบสแกนต่อเนื่อง (Dynamic Length)
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
@@ -166,7 +165,7 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
           <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50">
              {basket.map((item, index) => (
                 <div key={item.sku_15_digits} className={`bg-white p-5 rounded-[2.5rem] border shadow-sm flex flex-col shrink-0 transition-all duration-500 ${index === 0 ? 'border-blue-400 ring-2 ring-blue-500/10 scale-[1.02] z-20 shadow-blue-500/10' : 'border-slate-100'}`}>
-                   <div className="flex justify-between items-start mb-4">
+                   <div className="flex justify-between items-start mb-3">
                      <div className="flex-1 pr-4">
                         <div className="flex items-center gap-2 mb-1 leading-none">
                           {index === 0 && <span className="bg-blue-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded italic animate-pulse">LATEST</span>}
@@ -181,11 +180,27 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
                    </div>
 
-                   <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-                      <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
-                        <Package size={12} className="shrink-0" />
-                        <span className="text-[10px] font-black uppercase tracking-widest leading-none">Stock: {item.current_stock}</span>
+                   {/* 🌟 แสดงเรียง น้ำหนัก (ถ้ามี) และ สต๊อกปัจจุบัน (ไม่แสดงหน่วย) */}
+                   <div className="flex flex-col gap-1.5 mb-3 border-t border-slate-100 pt-3">
+                      {item.weight && (
+                        <div className="flex items-center justify-between text-amber-800 bg-amber-50/70 px-3 py-1.5 rounded-xl border border-amber-200/60">
+                          <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1">⚖️ น้ำหนัก</span>
+                          <span className="text-xs font-black">
+                            {Number(item.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px]">กก.</span>
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
+                        <div className="flex items-center gap-1.5">
+                          <Package size={12} className="shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-widest leading-none">สต๊อกปัจจุบัน</span>
+                        </div>
+                        <span className="text-xs font-black text-slate-800">{item.current_stock}</span>
                       </div>
+                   </div>
+
+                   <div className="flex justify-between items-center border-t border-slate-100 pt-3">
+                      <span className="text-[10px] font-black uppercase text-slate-400 italic">ปรับจำนวน</span>
                       <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl gap-2 border border-slate-200">
                          <button onClick={() => handleAmountChange(item.id, item.amount - 1)} className="w-8 h-8 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm active:scale-90 transition-all"><Minus size={16}/></button>
                          <input 
@@ -221,6 +236,7 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                                  <div className="flex items-center gap-2 mt-1.5 text-[9px] font-bold text-slate-400 uppercase italic">
                                     <span>{item.height}x{item.width}x{item.length}</span>
                                     <span>| LOT: {item.received_date}</span>
+                                    {item.weight && <span className="text-amber-700 font-bold">| น้ำหนัก: {Number(item.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</span>}
                                  </div>
                                  <p className="text-[9px] font-black text-blue-600 mt-1 uppercase italic leading-none">
                                     เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span>
