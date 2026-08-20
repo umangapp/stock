@@ -180,23 +180,30 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
                    </div>
 
-                   {/* 🌟 แสดงเรียง น้ำหนัก (ถ้ามี) และ สต๊อกปัจจุบัน (ไม่แสดงหน่วย) */}
+                   {/* 🌟 ถ้ามีน้ำหนัก แสดงน้ำหนัก + สต๊อกแบบไม่มีหน่วย / ถ้าไม่มีน้ำหนัก แสดงการ์ดแบบเดิม */}
                    <div className="flex flex-col gap-1.5 mb-3 border-t border-slate-100 pt-3">
-                      {item.weight && (
-                        <div className="flex items-center justify-between text-amber-800 bg-amber-50/70 px-3 py-1.5 rounded-xl border border-amber-200/60">
-                          <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1">⚖️ น้ำหนัก</span>
-                          <span className="text-xs font-black">
-                            {Number(item.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px]">กก.</span>
-                          </span>
+                      {item.weight ? (
+                        <>
+                          <div className="flex items-center justify-between text-amber-800 bg-amber-50/70 px-3 py-1.5 rounded-xl border border-amber-200/60">
+                            <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1">⚖️ น้ำหนัก</span>
+                            <span className="text-xs font-black">
+                              {Number(item.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px]">กก.</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
+                            <div className="flex items-center gap-1.5">
+                              <Package size={12} className="shrink-0" />
+                              <span className="text-[10px] font-black uppercase tracking-widest leading-none">สต๊อกปัจจุบัน</span>
+                            </div>
+                            <span className="text-xs font-black text-slate-800">{item.current_stock}</span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50 w-fit">
+                          <Package size={12} className="shrink-0" />
+                          <span className="text-[10px] font-black uppercase tracking-widest leading-none">Stock: {item.current_stock}</span>
                         </div>
                       )}
-                      <div className="flex items-center justify-between text-blue-600 bg-blue-50/50 px-3 py-1.5 rounded-xl border border-blue-100/50">
-                        <div className="flex items-center gap-1.5">
-                          <Package size={12} className="shrink-0" />
-                          <span className="text-[10px] font-black uppercase tracking-widest leading-none">สต๊อกปัจจุบัน</span>
-                        </div>
-                        <span className="text-xs font-black text-slate-800">{item.current_stock}</span>
-                      </div>
                    </div>
 
                    <div className="flex justify-between items-center border-t border-slate-100 pt-3">
@@ -242,9 +249,10 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                                     เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span>
                                  </p>
                               </div>
+                              {/* 🌟 ถ้ามีน้ำหนัก ซ่อนหน่วยนับ / ถ้าไม่มี แสดงหน่วยนับตามปกติ */}
                               <div className="text-right shrink-0">
                                  <span className={`text-2xl font-black leading-none ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'}{item.amount}</span>
-                                 <p className="text-[10px] font-black text-slate-300 uppercase mt-1 leading-none">{item.unit}</p>
+                                 {!item.weight && <p className="text-[10px] font-black text-slate-300 uppercase mt-1 leading-none">{item.unit}</p>}
                               </div>
                           </div>
                       ))}
