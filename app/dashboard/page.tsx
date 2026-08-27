@@ -8,7 +8,7 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import { 
   LayoutDashboard, Package, Settings, LogOut, Search, 
   ChevronDown, ChevronUp, Clock, Edit3, Plus, Trash2, FileSpreadsheet, Info, Zap, QrCode,
-  Users, CheckCircle2, Home, AlertTriangle
+  Users, CheckCircle2, Home, AlertTriangle, FileText
 } from 'lucide-react'
 
 import { parseExcelDate, parseDateToYYMMDD, validateSKU } from '@/lib/productUtils'
@@ -19,6 +19,7 @@ export default function AdminDashboard() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [activeTab, setActiveTab] = useState('inventory')
+  const [activeUser, setActiveUser] = useState('')
   const [transactions, setTransactions] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
   const [masterProducts, setMasterProducts] = useState<any[]>([])
@@ -54,12 +55,13 @@ export default function AdminDashboard() {
   const checkAdminAccess = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { router.push('/login'); return false }
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('role, full_name').eq('id', session.user.id).single()
     if (!profile || profile.role !== 'admin') {
       alert('⚠️ ขออภัยครับ: บัญชีผู้ใช้งานของคุณไม่มีสิทธิ์ในการเข้าถึงหน้าผู้ดูแลระบบ')
       router.push('/')
       return false
     }
+    setActiveUser(profile.full_name || session.user.email?.split('@')[0] || 'ADMIN')
     return true
   }
 
@@ -105,6 +107,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
+  // 🌟 ฟังก์ชันนำเข้าไฟล์ Excel (ตัดคอลัมน์ชื่อสินค้าออก -> Auto Lookup ชื่อจาก Master ด้วย Prefix)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -120,39 +123,47 @@ export default function AdminDashboard() {
         let hasValidationError = false;
         
         const importData = rows.map((row, index) => {
-          if (!row[1]) return null
+          if (!row[0]) return null
           if (hasValidationError) return null;
           
-          const prefix = String(row[0] || 'XXX').trim().toUpperCase(); 
-          const productName = String(row[1]).trim(); 
+          const prefix = String(row[0] || '').trim().toUpperCase(); 
+          if (!prefix) return null;
+
+          // 🌟 ดึงชื่อสินค้าอัตโนมัติจาก Master Products ตาม Prefix
+          const masterItem = masterProducts.find((mp: any) => mp.prefix === prefix);
+          if (!masterItem) {
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: ไม่พบตัวย่อสินค้า "${prefix}" ในระบบมาสเตอร์! กรุณาเพิ่มมาสเตอร์สินค้าก่อนนำเข้า`);
+            hasValidationError = true; return null;
+          }
+          const productName = masterItem.name;
           
-          const sizeStr = String(row[2] || '').toLowerCase().trim(); 
+          const sizeStr = String(row[1] || '').toLowerCase().trim(); 
           const sizeParts = sizeStr.split('x');
           const hVal = sizeParts[0] ? sizeParts[0].trim() : '';
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
           
-          const formattedDate = parseExcelDate(row[3]); 
-          const runningVal = String(row[4] || '01').padStart(2, '0').slice(-2); 
-          const unitVal = String(row[5] || '').trim(); 
+          const formattedDate = parseExcelDate(row[2]); 
+          const runningVal = String(row[3] || '01').padStart(2, '0').slice(-2); 
+          const unitVal = String(row[4] || '').trim(); 
           
+          const colGSku = String(row[6] || '').trim().toUpperCase(); 
           const colHSku = String(row[7] || '').trim().toUpperCase(); 
-          const colISku = String(row[8] || '').trim().toUpperCase(); 
           
           let weightVal = null;
           let currentStock = 0;
           let manualSku = '';
           let safetyStock = 0;
 
-          if (colHSku.length >= 8) {
+          if (colGSku.length >= 8) {
+            currentStock = Number(row[5] || 0); 
+            manualSku = colGSku;               
+            safetyStock = Number(row[7] || 0); 
+          } else {
+            weightVal = row[5] !== undefined && row[5] !== '' && row[5] !== null ? parseFloat(Number(row[5]).toFixed(2)) : null;
             currentStock = Number(row[6] || 0); 
             manualSku = colHSku;               
             safetyStock = Number(row[8] || 0); 
-          } else {
-            weightVal = row[6] !== undefined && row[6] !== '' && row[6] !== null ? parseFloat(Number(row[6]).toFixed(2)) : null;
-            currentStock = Number(row[7] || 0); 
-            manualSku = colISku;               
-            safetyStock = Number(row[9] || 0); 
           }
 
           if (!manualSku) {
@@ -167,13 +178,13 @@ export default function AdminDashboard() {
           }
 
           if (manualSku.length < 8) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าชื่อ "${productName}" รหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าตัวย่อ "${prefix}" รหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
           const paddingMatch = manualSku.match(/[X]+$/i);
           const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
           if (!/^\d{2}$/.test(coreSku.slice(-2))) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าชุด X ของ SKU สินค้า "${productName}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าชุด X ของ SKU สินค้า "${prefix}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
             hasValidationError = true; return null;
           }
 
@@ -195,9 +206,24 @@ export default function AdminDashboard() {
         if (hasValidationError) return;
         
         if (importData.length > 0) {
-          const { error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' })
+          const { data: savedProducts, error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' }).select()
           if (error) throw error
-          alert(`✅ ประมวลผลและนำเข้าสต๊อกสินค้าสำเร็จ ${importData.length} รายการ`); fetchData()
+
+          // 🌟 บันทึก Transaction สำหรับรายงานประวัติการ Import
+          if (savedProducts && savedProducts.length > 0) {
+            const importLogs = savedProducts.map((sp: any) => ({
+              product_id: sp.id,
+              type: 'import',
+              amount: sp.current_stock,
+              old_stock: 0,
+              new_stock: sp.current_stock,
+              created_by: activeUser || 'ADMIN (IMPORT)'
+            }));
+            await supabase.from('transactions').insert(importLogs);
+          }
+
+          alert(`✅ ประมวลผลและนำเข้าสต๊อกสินค้าสำเร็จ ${importData.length} รายการ`); 
+          fetchData();
         }
       } catch (err: any) { alert("❌ การนำเข้าผิดพลาด: " + err.message) }
       
@@ -262,9 +288,14 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
+  // 🌟 เพิ่มการกรองรหัส SKU ในช่องค้นหา
   const grouped3LayerInventory = products
     .filter(p => !showLowStockOnly || p.current_stock <= (p.safety_stock || 0))
-    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.prefix.toLowerCase().includes(searchQuery.toLowerCase()))
+    .filter(p => 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.prefix.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.sku_15_digits || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
     .reduce((acc: any, item: any) => {
       const isLowStock = item.current_stock <= (item.safety_stock || 0);
       if (!acc[item.name]) acc[item.name] = { name: item.name, prefix: item.prefix || 'XXX', totalStock: 0, unit: item.unit, hasLowStock: false, heights: {} };
@@ -319,11 +350,13 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* 🌟 เพิ่มแท็บ รายงาน Import ในเมนูด้านซ้าย */}
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto pb-2 lg:pb-0">
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
             { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
             { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
+            { id: 'reports', label: 'รายงาน Import', icon: FileText },
             { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users },
             { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
           ].map((item) => (
@@ -353,7 +386,7 @@ export default function AdminDashboard() {
                   
                   <div className="relative flex-1 min-w-[200px]">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
-                    <input type="text" placeholder="ค้นหา..." className="w-full bg-white border p-4 pl-12 rounded-2xl outline-none shadow-sm focus:border-blue-500 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                    <input type="text" placeholder="ค้นหาชื่อ, ตัวย่อ หรือ SKU..." className="w-full bg-white border p-4 pl-12 rounded-2xl outline-none shadow-sm focus:border-blue-500 font-bold" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
                   </div>
                   
                   <button onClick={handleImportClick} className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black uppercase text-xs flex items-center gap-2 shadow-lg active:scale-95 transition-all"><FileSpreadsheet size={16}/> Import</button>
@@ -452,7 +485,7 @@ export default function AdminDashboard() {
                                          </div>
                                       )}
                                    </div>
-                                ))}
+                                me))}
                               </div>
                            )}
                         </div>
@@ -491,16 +524,27 @@ export default function AdminDashboard() {
                                     <span className="text-[13px] font-black text-slate-800 uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Lot: {log.products?.received_date}</span>
                                 </div>
                             </div>
-                            <span className={`text-3xl font-black ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'} {log.amount}</span>
+                            <span className={`text-3xl font-black ${log.type === 'receive' || log.type === 'import' ? 'text-green-600' : 'text-red-600'}`}>
+                              {log.type === 'receive' || log.type === 'import' ? '+' : '-'} {log.amount}
+                            </span>
                           </div>
-                          <div className="bg-blue-50/50 p-2 rounded-lg"><SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} /></div>
+                          
+                          <div className="bg-blue-50/50 p-2 rounded-lg">
+                            <SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
+                          </div>
+                          
+                          {/* 🌟 แสดงการเปลี่ยนแปลงสต๊อกเดิม -> ใหม่ */}
+                          <p className="text-[12px] font-black text-blue-600 mt-1 italic leading-none">
+                            STOCK: {log.old_stock ?? 0} → {log.new_stock ?? log.amount}
+                          </p>
+
                           <div className="pt-2.5 mt-0.5 border-t border-slate-100 flex justify-between items-center text-[11px] font-bold text-slate-400">
                             <div className="flex items-center gap-1">
                               <Clock size={12} className="text-slate-400" />
                               <span>{new Date(log.created_at).toLocaleDateString('th-TH')} | {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
                             </div>
-                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${log.type === 'receive' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : 'text-red-600 bg-red-50 border border-red-100'}`}>
-                              {log.type === 'receive' ? 'สแกนเข้าคลัง' : 'สแกนจ่ายออก'}
+                            <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${log.type === 'receive' ? 'text-emerald-600 bg-emerald-50 border border-emerald-100' : log.type === 'import' ? 'text-blue-600 bg-blue-50 border border-blue-100' : 'text-red-600 bg-red-50 border border-red-100'}`}>
+                              {log.type === 'receive' ? 'สแกนเข้าคลัง' : log.type === 'import' ? 'IMPORT สต๊อก' : 'สแกนจ่ายออก'}
                             </span>
                           </div>
                         </div>
@@ -509,6 +553,72 @@ export default function AdminDashboard() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* 🌟 TAB: รายงานประวัติการ Import สต๊อก */}
+        {activeTab === 'reports' && (
+          <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">รายงานประวัติการ Import สต๊อก</h2>
+                <p className="text-xs text-slate-400 font-bold mt-1">รายการอัปเดตสต๊อกผ่านการนำเข้าไฟล์ Excel ทั้งหมด</p>
+              </div>
+              <span className="bg-emerald-50 text-emerald-600 border border-emerald-200 px-4 py-2 rounded-2xl text-xs font-black">
+                รวม {transactions.filter(t => t.type === 'import').length} รายการ
+              </span>
+            </div>
+
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                      <th className="p-4">วัน-เวลาที่ Import</th>
+                      <th className="p-4">สินค้า / SKU</th>
+                      <th className="p-4 text-center">จำนวนนำเข้า</th>
+                      <th className="p-4 text-center">สต๊อก (เดิม → ใหม่)</th>
+                      <th className="p-4 text-right">ผู้ดำเนินการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
+                    {transactions.filter(t => t.type === 'import').length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400 italic">ยังไม่มีประวัติการ Import สต๊อกในระบบ</td>
+                      </tr>
+                    ) : (
+                      transactions.filter(t => t.type === 'import').map(log => (
+                        <tr key={log.id} className="hover:bg-slate-50/80 transition-all">
+                          <td className="p-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5 text-slate-500">
+                              <Clock size={12} className="text-blue-500" />
+                              <span>{new Date(log.created_at).toLocaleDateString('th-TH')} {new Date(log.created_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <p className="font-black text-slate-900 uppercase text-sm leading-tight">{log.products?.name}</p>
+                            <SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-xl font-black text-sm">
+                              +{log.amount} {!log.products?.weight && log.products?.unit}
+                            </span>
+                          </td>
+                          <td className="p-4 text-center font-mono font-black text-blue-600">
+                            {log.old_stock ?? 0} → {log.new_stock ?? log.amount}
+                          </td>
+                          <td className="p-4 text-right">
+                            <span className="bg-slate-100 text-slate-600 px-3 py-1 rounded-xl text-[10px] font-black uppercase">
+                              {log.created_by || 'ADMIN'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         )}
