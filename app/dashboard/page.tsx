@@ -107,7 +107,6 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชันนำเข้าไฟล์ Excel (ตัดคอลัมน์ชื่อสินค้าออก -> Auto Lookup ชื่อจาก Master ด้วย Prefix)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -129,7 +128,6 @@ export default function AdminDashboard() {
           const prefix = String(row[0] || '').trim().toUpperCase(); 
           if (!prefix) return null;
 
-          // 🌟 ดึงชื่อสินค้าอัตโนมัติจาก Master Products ตาม Prefix
           const masterItem = masterProducts.find((mp: any) => mp.prefix === prefix);
           if (!masterItem) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: ไม่พบตัวย่อสินค้า "${prefix}" ในระบบมาสเตอร์! กรุณาเพิ่มมาสเตอร์สินค้าก่อนนำเข้า`);
@@ -209,7 +207,6 @@ export default function AdminDashboard() {
           const { data: savedProducts, error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' }).select()
           if (error) throw error
 
-          // 🌟 บันทึก Transaction สำหรับรายงานประวัติการ Import
           if (savedProducts && savedProducts.length > 0) {
             const importLogs = savedProducts.map((sp: any) => ({
               product_id: sp.id,
@@ -288,7 +285,6 @@ export default function AdminDashboard() {
     return acc;
   }, {});
 
-  // 🌟 เพิ่มการกรองรหัส SKU ในช่องค้นหา
   const grouped3LayerInventory = products
     .filter(p => !showLowStockOnly || p.current_stock <= (p.safety_stock || 0))
     .filter(p => 
@@ -314,18 +310,8 @@ export default function AdminDashboard() {
       return acc;
   }, {});
 
-if (loading) {
-  return (
-    <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">
-      VERIFYING ACCESS...
-    </div>
-  );
-}
-<style>{`
-  @media print {
-    /* print styles */
-  }
-`}</style>
+  if (loading) return <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">VERIFYING ACCESS...</div>
+
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
       
@@ -360,7 +346,6 @@ if (loading) {
           </div>
         </div>
 
-        {/* 🌟 เพิ่มแท็บ รายงาน Import ในเมนูด้านซ้าย */}
         <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto pb-2 lg:pb-0">
           {[
             { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
@@ -495,7 +480,7 @@ if (loading) {
                                          </div>
                                       )}
                                    </div>
-                                me))}
+                                ))}
                               </div>
                            )}
                         </div>
@@ -543,7 +528,6 @@ if (loading) {
                             <SKUColoredAdmin sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
                           </div>
                           
-                          {/* 🌟 แสดงการเปลี่ยนแปลงสต๊อกเดิม -> ใหม่ */}
                           <p className="text-[12px] font-black text-blue-600 mt-1 italic leading-none">
                             STOCK: {log.old_stock ?? 0} → {log.new_stock ?? log.amount}
                           </p>
@@ -567,7 +551,7 @@ if (loading) {
           </div>
         )}
 
-        {/* 🌟 TAB: รายงานประวัติการ Import สต๊อก */}
+        {/* TAB: รายงานประวัติการ Import สต๊อก */}
         {activeTab === 'reports' && (
           <div className="space-y-8 animate-in fade-in text-slate-800 no-print">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
