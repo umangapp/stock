@@ -2,18 +2,16 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation' 
-// 🌟 🤖 นำเข้าไอคอน Home และ LogOut เพิ่มเติมเรียบร้อยครับ
 import { QrCode, ScanLine, Zap, Search, Clock, User, X, Info, Home, LogOut } from 'lucide-react'
 import SingleScanner from './SingleScanner'
 import BatchScanner from './BatchScanner'
 
-// 🌟 🤖 ฟังก์ชันแยกสี SKU ตัวจบ (ดักจับ X ใหญ่ + ปลายสายปรับเป็นสีเทา Slate ตามสั่งเรียบร้อยครับพี่ตั้ม)
+// ฟังก์ชันแยกสี SKU ตัวจบ (ดักจับ X ใหญ่ + ปลายสายปรับเป็นสีเทา Slate)
 const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   if (!sku) return null;
   const cleanSku = sku.trim();
   const preLen = prefix?.length || 2;
   
-  // 🔒 เปลี่ยนเป็น /[xX]+$/ เพื่อดักจับทั้ง x เล็ก และ X ใหญ่ ไม่ให้ตำแหน่งตัวเลขเลื่อนพัง
   const paddingMatch = cleanSku.match(/[xX]+$/);
   const paddingLen = paddingMatch ? paddingMatch[0].length : 0;
   
@@ -27,7 +25,6 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
       <span className="text-blue-600">{p1}</span>
       <span className="text-green-600">{p2}</span>
       <span className="text-orange-500">{p3}</span>
-      {/* 🔒 เปลี่ยนจาก text-cyan-400 เดิม ให้กลายเป็นสีเทา text-slate-400 ตามสเปกใหม่ครับ */}
       <span className="text-slate-400">{p4}</span>
     </span>
   );
@@ -44,12 +41,15 @@ export default function ScanPage() {
   const [showHistory, setShowHistory] = useState(false)
   const [scanInput, setScanInput] = useState('')
 
-  // 🌟 🤖 อ่านค่าโหมดจาก URL อย่างปลอดภัย ไม่ให้กระทบระบบกล้อง
+  // อ่านค่าโหมดจาก URL อย่างปลอดภัย และอัปเดต scanMode ให้ตรงกัน
   const [urlMode, setUrlMode] = useState<string | null>(null)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search)
-      setUrlMode(params.get('mode'))
+      const modeParam = params.get('mode')
+      setUrlMode(modeParam)
+      if (modeParam === 'issue') setScanMode('issue')
+      else if (modeParam === 'receive') setScanMode('receive')
     }
   }, [])
 
@@ -70,7 +70,10 @@ export default function ScanPage() {
     setPersonalLogs(logs || [])
 
     const { data: conf } = await supabase.from('settings_app_config').select('*').single()
-    if (conf) { setAppVersion(conf.version); setScanDelay(conf.scan_delay || 1000); }
+    if (conf) { 
+      setAppVersion(conf.version); 
+      setScanDelay(conf.scan_delay || 1000); 
+    }
   }, [router])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -80,22 +83,39 @@ export default function ScanPage() {
     setView('single');
   }
 
-  if (view === 'single') return <SingleScanner scanMode={scanMode} activeUser={activeUser} initialSKU={scanInput} onRefresh={fetchData} onClose={() => { setView('menu'); setScanInput(''); }} />
-  if (view === 'batch') return <BatchScanner scanMode={scanMode} activeUser={activeUser} scanDelay={scanDelay} onRefresh={fetchData} onClose={() => setView('menu')} />
+  // 🌟 ส่งค่า scanDelay={scanDelay} เข้า SingleScanner เพื่อให้หน่วงเวลาเหมือน BatchScanner
+  if (view === 'single') return (
+    <SingleScanner 
+      scanMode={scanMode} 
+      activeUser={activeUser} 
+      initialSKU={scanInput} 
+      scanDelay={scanDelay}
+      onRefresh={fetchData} 
+      onClose={() => { setView('menu'); setScanInput(''); }} 
+    />
+  )
+
+  if (view === 'batch') return (
+    <BatchScanner 
+      scanMode={scanMode} 
+      activeUser={activeUser} 
+      scanDelay={scanDelay} 
+      onRefresh={fetchData} 
+      onClose={() => setView('menu')} 
+    />
+  )
 
   return (
     <div className="flex flex-col h-[100dvh] bg-[#0a0f18] text-white overflow-hidden font-sans">
       
-      {/* 🔒 🤖 แถบหัวบนแบบโมเดิร์น ล็อกพื้นที่ให้พอดีจอมือถือ ปุ่มแอกชันฝั่งขวาใช้ระบบ Icon เพียวๆ ไม่ตกบรรทัดครับ */}
+      {/* แถบหัวบน */}
       <header className="px-4 py-4 flex justify-between items-center bg-[#1e293b] border-b border-white/5 z-50 shrink-0">
         <div>
           <h1 className="text-xs font-black uppercase italic text-blue-400 leading-none">Scan Center</h1>
           <p className="text-[8px] font-black text-slate-500 uppercase mt-1">Version {appVersion}</p>
         </div>
         
-        {/* รวมกลุ่มปุ่มควบคุมฝั่งขวา */}
         <div className="flex items-center gap-2">
-          {/* ปุ่มประวัติรายการแบบย่อ ขนาดกระทัดรัดสำหรับมือถือ */}
           <button 
             onClick={() => { fetchData(); setShowHistory(true); }} 
             className="bg-blue-600 px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg whitespace-nowrap active:scale-95 transition-all"
@@ -103,7 +123,6 @@ export default function ScanPage() {
             ประวัติ
           </button>
           
-          {/* 🏠 ปุ่มกลับหน้าเมนูหลัก */}
           <button 
             onClick={() => router.push('/')} 
             className="p-2 bg-slate-800 text-amber-400 border border-slate-700/60 rounded-xl active:scale-95 transition-all shadow-md"
@@ -112,7 +131,6 @@ export default function ScanPage() {
             <Home size={18} />
           </button>
           
-          {/* 🚪 ปุ่มออกจากระบบ */}
           <button 
             onClick={() => {
               if(confirm("🔒 ยืนยันการออกจากระบบพนักงานหรือไม่?")) {
@@ -130,13 +148,13 @@ export default function ScanPage() {
       <main className="flex-1 p-6 flex flex-col gap-8 justify-center max-w-sm mx-auto w-full animate-in fade-in">
         <div className="text-center mb-[-15px]">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">โหมดปัจจุบัน: </span>
-          <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded ${urlMode === 'receive' || scanMode === 'receive' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-            {urlMode === 'receive' || scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}
+          <span className={`text-[11px] font-black uppercase px-2 py-0.5 rounded ${scanMode === 'receive' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+            {scanMode === 'receive' ? 'นำเข้า (+)' : 'นำออก (-)'}
           </span>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-           {/* 🌟 🤖 ซ่อน/แสดง ปุ่มนำเข้า (ทีละชิ้น และ ต่อเนื่อง) */}
+           {/* ซ่อน/แสดง ปุ่มนำเข้า ตาม URL mode */}
            {(!urlMode || urlMode === 'receive') && (
              <>
                <button onClick={() => { setScanMode('receive'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-green-400"/><span className="text-[11px] font-black uppercase text-center">นำเข้า<br/>(ทีละชิ้น)</span></button>
@@ -144,7 +162,7 @@ export default function ScanPage() {
              </>
            )}
            
-           {/* 🌟 🤖 ซ่อน/แสดง ปุ่มนำออก (ทีละชิ้น และ ต่อเนื่อง) */}
+           {/* ซ่อน/แสดง ปุ่มนำออก ตาม URL mode */}
            {(!urlMode || urlMode === 'issue') && (
              <>
                <button onClick={() => { setScanMode('issue'); setView('single'); }} className="aspect-square bg-slate-800 rounded-[2rem] flex flex-col items-center justify-center gap-3 border-b-4 border-slate-950"><ScanLine size={40} className="text-red-400"/><span className="text-[11px] font-black uppercase text-center leading-tight">นำออก<br/>(ทีละชิ้น)</span></button>
@@ -191,14 +209,13 @@ export default function ScanPage() {
                                   <p className="font-black text-sm uppercase leading-none mb-1.5">{log.products?.name}</p>
                                   <SKUColored sku={log.products?.sku_15_digits} prefix={log.products?.prefix} />
                                   
-                                  {/* 🌟 🤖 เพิ่มการแสดงผลน้ำหนัก ต่อจากขนาดและ LOT ตรงนี้เลยครับ */}
                                   <div className="flex flex-wrap items-center gap-2 mt-2 text-[9px] font-bold text-slate-400 italic uppercase">
                                      <span>{log.products?.height}x{log.products?.width}x{log.products?.length} มม.</span>
                                      <span className="bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-slate-500">LOT: {log.products?.received_date}</span>
                                      
                                      {log.products?.weight && (
-                                       <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
-                                         ⚖️ {log.products.weight} กก.
+                                       <span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 font-bold">
+                                         ⚖️ {Number(log.products.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.
                                        </span>
                                      )}
                                   </div>
@@ -207,7 +224,7 @@ export default function ScanPage() {
                               </div>
                               <div className="text-right shrink-0">
                                   <span className={`text-2xl font-black leading-none ${log.type === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{log.type === 'receive' ? '+' : '-'}{log.amount}</span>
-                                  <p className="text-[9px] font-black uppercase text-slate-300 mt-1">{log.products?.unit}</p>
+                                  {!log.products?.weight && <p className="text-[9px] font-black uppercase text-slate-300 mt-1">{log.products?.unit}</p>}
                               </div>
                           </div>
                           <div className="pt-3 border-t border-slate-50 flex justify-between items-center text-[9px] font-black text-slate-300 uppercase italic">
