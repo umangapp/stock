@@ -11,7 +11,6 @@ import {
   Users, CheckCircle2, Home, AlertTriangle
 } from 'lucide-react'
 
-// 🌟 Import Component และ Utilities ที่เราแยกไว้
 import { parseExcelDate, parseDateToYYMMDD, validateSKU } from '@/lib/productUtils'
 import SKUColoredAdmin from '@/components/SKUColored'
 import ProductModal from '@/components/ProductModal'
@@ -106,7 +105,6 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // ฟังก์ชันนำเข้าไฟล์ Excel
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -208,7 +206,6 @@ export default function AdminDashboard() {
     reader.readAsArrayBuffer(file)
   }
 
-  // ฟังก์ชันจัดการฟอร์มสินค้า
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
@@ -258,7 +255,6 @@ export default function AdminDashboard() {
     else fetchData();
   }
 
-  // จัดกลุ่มข้อมูลเพื่อการแสดงผล
   const groupedByUser = transactions.reduce((acc: any, t: any) => {
     const user = t.created_by || 'Unknown';
     if (!acc[user]) acc[user] = [];
@@ -570,8 +566,8 @@ export default function AdminDashboard() {
                  <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2"><Info size={18}/> App Version</h4>
                  <input type="text" className="w-full sm:w-64 bg-white/5 p-5 rounded-2xl border border-white/10 outline-none focus:border-blue-500 font-black text-xl" value={newVersionInput} onChange={e => setNewVersionInput(e.target.value)} />
                </div>
-<div className="space-y-5 border-t border-white/5 pt-8">
-                 {/* หัวข้อ + ป้ายแสดงค่าปัจจุบันแบบเรียลไทม์ */}
+
+               <div className="space-y-5 border-t border-white/5 pt-8">
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                    <h4 className="font-black uppercase text-sm text-blue-400 tracking-widest flex items-center gap-2">
                      <Zap size={18}/> ความไวการสแกน
@@ -581,7 +577,6 @@ export default function AdminDashboard() {
                    </span>
                  </div>
 
-                 {/* สไลเดอร์ปรับค่า 300ms - 3000ms */}
                  <div className="space-y-3">
                    <input 
                      type="range" 
@@ -593,7 +588,6 @@ export default function AdminDashboard() {
                      onChange={e => setScanDelay(Number(e.target.value))} 
                    />
 
-                   {/* ขีดบอกระยะ 0.3s / 1.0s / 2.0s / 3.0s */}
                    <div className="grid grid-cols-4 text-center text-[10px] font-black uppercase pt-2 border-t border-white/10">
                      <div className="text-left flex flex-col items-start">
                        <span className="text-emerald-400 font-black">🚀 0.3s</span>
@@ -618,6 +612,16 @@ export default function AdminDashboard() {
                    บันทึกตั้งค่า
                  </button>
                </div>
+             </div>
+
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
+                   <h4 className="font-black uppercase text-sm mb-6 text-blue-600 tracking-widest">มาสเตอร์สินค้า (ตัวย่อ/Prefix)</h4>
+                   <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                      <input type="text" className="flex-[2] bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-bold" placeholder="ชื่อสินค้าหลัก" value={inputName} onChange={e => setInputName(e.target.value)} />
+                      <input type="text" className="flex-1 bg-slate-50 p-4 rounded-2xl border outline-none focus:border-blue-500 font-black uppercase text-blue-600 text-center" placeholder="ตัวย่อ" maxLength={3} value={inputPrefix} onChange={e => setInputPrefix(e.target.value)} />
+                      <button onClick={() => { supabase.from('settings_product_master').insert([{name: inputName, prefix: inputPrefix}]).then(() => {setInputName(''); setInputPrefix(''); fetchData();}) }} className="bg-blue-600 text-white p-4 rounded-2xl shadow-lg active:scale-95"><Plus/></button>
+                   </div>
                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2 font-bold">{masterProducts.map(item => (<div key={item.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 shadow-sm"><span>{item.name} <span className="text-blue-600 ml-2">[{item.prefix}]</span></span><button onClick={() => { if(confirm("ลบ?")) supabase.from('settings_product_master').delete().eq('id', item.id).then(()=>fetchData()) }} className="text-red-400 p-2"><Trash2 size={18}/></button></div>))}</div>
                 </div>
 
@@ -634,7 +638,6 @@ export default function AdminDashboard() {
         )}
       </main>
 
-      {/* 🌟 🤖 เรียกใช้ Product Modal ที่เราแยกไฟล์ออกมา */}
       <ProductModal 
         isOpen={isAddModalOpen || isEditModalOpen}
         isEditModal={isEditModalOpen}
