@@ -1,6 +1,6 @@
 'use client'
-import { useState } from 'react'
-import { Search, Calendar, User, RotateCcw, Clock } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Search, Calendar, User, RotateCcw, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import SKUColoredAdmin from '@/components/SKUColored'
 
 export default function HistoryReportTab({ transactions, userProfiles }: any) {
@@ -10,20 +10,36 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
   const [reportSearchUser, setReportSearchUser] = useState('')
   const [reportSearchType, setReportSearchType] = useState('all')
 
-  // 🌟 ฟังก์ชันเคลียร์ค่าทุกช่อง
+  // 🌟 State สำหรับการแบ่งหน้า (Pagination)
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 50
+
+  // 🌟 ฟังก์ชันแปลง YYYY-MM-DD เป็น วัน/เดือน/ปี (DD/MM/YYYY)
+  const formatDateToThai = (dateStr: string) => {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  // รีเซ็ตไปหน้า 1 เมื่อมีการเปลี่ยนตัวกรองค้นหา
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [reportSearchSku, reportStartDate, reportEndDate, reportSearchUser, reportSearchType]);
+
   const handleClearFilters = () => {
     setReportSearchSku('');
     setReportStartDate('');
     setReportEndDate('');
     setReportSearchUser('');
     setReportSearchType('all');
+    setCurrentPage(1);
   };
 
   const isFiltered = Boolean(
     reportSearchSku || reportStartDate || reportEndDate || reportSearchUser || reportSearchType !== 'all'
   );
 
-  // 🌟 กรองข้อมูลตามช่วงวันที่ Start - End และเงื่อนไขอื่นๆ
+  // 1. กรองข้อมูลทั้งหมดตามเงื่อนไข
   const filteredReports = transactions.filter((log: any) => {
     const matchesSku = !reportSearchSku || 
       (log.products?.sku_15_digits || '').toLowerCase().includes(reportSearchSku.toLowerCase()) ||
@@ -42,19 +58,116 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
     return matchesSku && matchesStart && matchesEnd && matchesUser && matchesType;
   });
 
+  // 2. คำนวณการแบ่งหน้า
+  const totalPages = Math.ceil(filteredReports.length / itemsPerPage) || 1;
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedReports = filteredReports.slice(startIndex, endIndex);
+
+  // 🌟 Component ปุ่มสลับหน้า (Pagination Controls)
+  const renderPaginationControls = () => {
+    if (totalPages <= 1) return null;
+
+    const maxVisibleButtons = 5;
+    let startPage = Math.max(1, safeCurrentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
+
+    if (endPage - startPage + 1 < maxVisibleButtons) {
+      startPage = Math.max(1, endPage - maxVisibleButtons + 1);
+    }
+
+    const pageNumbers = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i);
+    }
+
+    return (
+      <div className="flex items-center gap-1.5">
+        {/* ปุ่มหน้าก่อนหน้า */}
+        <button
+          onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+          disabled={safeCurrentPage === 1}
+          className="p-2 rounded-xl border bg-white border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-xs font-bold transition-all shadow-sm"
+          title="หน้าก่อนหน้า"
+        >
+          <ChevronLeft size={16} />
+        </button>
+
+        {/* ปุ่มหน้า 1 ถ้ากรณีอยู่ไกล */}
+        {startPage > 1 && (
+          <>
+            <button
+              onClick={() => setCurrentPage(1)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
+            >
+              1
+            </button>
+            {startPage > 2 && <span className="text-xs text-slate-400 px-0.5">...</span>}
+          </>
+        )}
+
+        {/* ปุ่มตัวเลขหน้า */}
+        {pageNumbers.map((page) => (
+          <button
+            key={page}
+            onClick={() => setCurrentPage(page)}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all ${
+              safeCurrentPage === page
+                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 shadow-sm'
+            }`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {/* ปุ่มหน้าสุดท้าย ถ้ากรณีอยู่ไกล */}
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && <span className="text-xs text-slate-400 px-0.5">...</span>}
+            <button
+              onClick={() => setCurrentPage(totalPages)}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
+            >
+              {totalPages}
+            </button>
+          </>
+        )}
+
+        {/* ปุ่มหน้าถัดไป */}
+        <button
+          onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+          disabled={safeCurrentPage === totalPages}
+          className="p-2 rounded-xl border bg-white border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white text-xs font-bold transition-all shadow-sm"
+          title="หน้าถัดไป"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in text-slate-800 no-print">
+      
+      {/* 🌟 Header + สรุปจำนวน + Pagination มุมขวาบน */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">รายงานประวัติการทำงาน</h2>
           <p className="text-xs text-slate-400 font-bold mt-1">ประวัติการสแกนเข้า สแกนออก และการ Import สต๊อกของผู้ใช้งานทั้งหมด</p>
         </div>
-        <span className="bg-blue-50 text-blue-600 border border-blue-200 px-4 py-2 rounded-2xl text-xs font-black">
-          แสดงผล {filteredReports.length} / {transactions.length} รายการ
-        </span>
+
+        {/* ฝั่งมุมขวาบน */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 self-end sm:self-auto">
+          <span className="bg-blue-50 text-blue-600 border border-blue-200 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
+            แสดงผล {filteredReports.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredReports.length)} จาก {filteredReports.length} รายการ
+          </span>
+          {renderPaginationControls()}
+        </div>
       </div>
 
-      {/* 🌟 แผงปุ่มค้นหาและ Filter */}
+      {/* แผงปุ่มค้นหาและ Filter */}
       <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           
@@ -71,27 +184,41 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           </div>
 
           {/* 2. ตั้งแต่วันที่ */}
-          <div className="relative">
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16}/>
+          <div className="relative min-h-[42px]">
+            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16}/>
             <input 
               type="date" 
               title="ตั้งแต่วันที่"
-              className="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:border-blue-500 text-xs font-bold text-slate-700"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
               value={reportStartDate}
               onChange={(e) => setReportStartDate(e.target.value)}
             />
+            <div className="w-full h-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-xs font-bold text-slate-700 flex items-center">
+              {reportStartDate ? (
+                <span className="text-slate-900 font-black">{formatDateToThai(reportStartDate)}</span>
+              ) : (
+                <span className="text-slate-400 font-bold">เริ่มต้น (วัน/เดือน/ปี)</span>
+              )}
+            </div>
           </div>
 
           {/* 3. ถึงวันที่ */}
-          <div className="relative">
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16}/>
+          <div className="relative min-h-[42px]">
+            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16}/>
             <input 
               type="date" 
               title="ถึงวันที่"
-              className="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:border-blue-500 text-xs font-bold text-slate-700"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
               value={reportEndDate}
               onChange={(e) => setReportEndDate(e.target.value)}
             />
+            <div className="w-full h-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-xs font-bold text-slate-700 flex items-center">
+              {reportEndDate ? (
+                <span className="text-slate-900 font-black">{formatDateToThai(reportEndDate)}</span>
+              ) : (
+                <span className="text-slate-400 font-bold">ถึงวันที่ (วัน/เดือน/ปี)</span>
+              )}
+            </div>
           </div>
 
           {/* 4. ผู้ดำเนินการ */}
@@ -125,11 +252,11 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
 
         </div>
 
-        {/* 🌟 แถบแสดงสถานะช่วงวันที่ + ปุ่มเคลียร์ทุกช่อง */}
+        {/* แถบแสดงสถานะช่วงวันที่ + ปุ่มเคลียร์ทุกช่อง */}
         <div className="flex justify-between items-center pt-2 border-t border-slate-100">
           <div className="text-[11px] text-slate-400 font-bold">
             {(reportStartDate || reportEndDate) && (
-              <span>ช่วงวันที่: <strong className="text-slate-700">{reportStartDate || 'เริ่มต้น'}</strong> ถึง <strong className="text-slate-700">{reportEndDate || 'ปัจจุบัน'}</strong></span>
+              <span>ช่วงวันที่: <strong className="text-slate-700">{formatDateToThai(reportStartDate) || 'เริ่มต้น'}</strong> ถึง <strong className="text-slate-700">{formatDateToThai(reportEndDate) || 'ปัจจุบัน'}</strong></span>
             )}
           </div>
           <button 
@@ -161,12 +288,12 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
-              {filteredReports.length === 0 ? (
+              {paginatedReports.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-slate-400 italic">ไม่พบข้อมูลประวัติที่ตรงตามเงื่อนไขการค้นหา</td>
                 </tr>
               ) : (
-                filteredReports.map((log: any) => {
+                paginatedReports.map((log: any) => {
                   const isReceive = log.type === 'receive';
                   const isImport = log.type === 'import';
                   const isIssue = log.type === 'issue';
@@ -214,7 +341,18 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
             </tbody>
           </table>
         </div>
+
+        {/* 🌟 Pagination Controls มุมขวาล่างใต้ตาราง */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-6 mt-2 border-t border-slate-100">
+            <span className="text-xs font-bold text-slate-400">
+              หน้า <strong className="text-slate-700">{safeCurrentPage}</strong> จาก <strong className="text-slate-700">{totalPages}</strong> (แสดงผล {startIndex + 1} - {Math.min(endIndex, filteredReports.length)} จาก {filteredReports.length} รายการ)
+            </span>
+            {renderPaginationControls()}
+          </div>
+        )}
       </div>
+
     </div>
   )
 }
