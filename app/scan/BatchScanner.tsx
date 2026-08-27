@@ -59,7 +59,7 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   );
 };
 
-export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose, onRefresh }: any) {
+export default function BatchScanner({ scanMode, activeUser, scanDelay = 1000, onClose, onRefresh }: any) {
   const [basket, setBasket] = useState<any[]>([])
   const [visualLock, setVisualLock] = useState(false)
   const [showBatchSummary, setShowBatchSummary] = useState(false)
@@ -87,7 +87,8 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
 
   const handleScan = async (sku: string) => {
     if (isScanLocked.current) return;
-    isScanLocked.current = true;
+    isScanLocked.current = true; // 🌟 ล็อกทันทีตั้งแต่แรก
+
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
     
     if (p) {
@@ -97,7 +98,9 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
             if (currentQty + 1 > p.current_stock) { 
                 playErrorSound(); 
                 alert(`❌ สต๊อกไม่พอจ่าย!\n"${p.name}" เหลือเพียง ${p.current_stock}`); 
-                isScanLocked.current = false; return; 
+                // 🌟 หน่วงเวลาตาม scanDelay ก่อนปลดล็อกกล้อง
+                setTimeout(() => { isScanLocked.current = false; }, scanDelay); 
+                return; 
             }
         }
         
@@ -112,19 +115,48 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
         });
         setVisualLock(true);
         setTimeout(() => { isScanLocked.current = false; setVisualLock(false); }, scanDelay);
-    } else { isScanLocked.current = false; }
+    } else { 
+      // 🌟 ถ้าไม่พบสินค้า หน่วงเวลาตาม scanDelay ก่อนปลดล็อกกล้อง
+      setTimeout(() => { isScanLocked.current = false; }, scanDelay); 
+    }
   }
 
   const handleFinalSave = async () => {
+    if (isSaving) return; // 🌟 กันกดปุ่มบันทึกเบิ้ล
     setIsSaving(true);
+
     try {
       for (const item of basket) {
-          const newStock = scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount;
+          // 🌟 1. ดึงสต๊อกสดล่าสุดจาก DB ก่อนตัดสต๊อกจริง
+          const { data: freshProduct } = await supabase.from('products').select('current_stock').eq('id', item.id).single();
+          const liveStock = freshProduct?.current_stock ?? item.current_stock;
+
+          // 🌟 2. ตรวจสอบสต๊อกสดอีกครั้งก่อนบันทึก
+          if (scanMode === 'issue' && item.amount > liveStock) {
+            playErrorSound();
+            alert(`❌ สต๊อกไม่พอจ่ายสำหรับ "${item.name}"! (คงเหลือในระบบ: ${liveStock})`);
+            setIsSaving(false);
+            return;
+          }
+
+          const newStock = scanMode === 'receive' ? liveStock + item.amount : liveStock - item.amount;
           await supabase.from('products').update({ current_stock: newStock }).eq('id', item.id);
-          await supabase.from('transactions').insert([{ product_id: item.id, type: scanMode, amount: item.amount, old_stock: item.current_stock, new_stock: newStock, created_by: activeUser }]);
+          await supabase.from('transactions').insert([{ 
+            product_id: item.id, 
+            type: scanMode, 
+            amount: item.amount, 
+            old_stock: liveStock, 
+            new_stock: newStock, 
+            created_by: activeUser 
+          }]);
       }
-      onRefresh(); onClose();
-    } catch (e) { alert("เกิดข้อผิดพลาดในการบันทึก"); } finally { setIsSaving(false); }
+      onRefresh(); 
+      onClose();
+    } catch (e) { 
+      alert("เกิดข้อผิดพลาดในการบันทึก"); 
+    } finally { 
+      setIsSaving(false); 
+    }
   }
 
   const handleAmountChange = (id: string, newAmount: number) => {
@@ -180,7 +212,6 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                      <button onClick={() => setBasket(prev => prev.filter(i => i.id !== item.id))} className="p-3 bg-red-50 text-red-500 rounded-2xl border border-red-100 active:scale-90 transition-all shadow-sm"><Trash2 size={18}/></button>
                    </div>
 
-                   {/* 🌟 ถ้ามีน้ำหนัก แสดงน้ำหนัก + สต๊อกแบบไม่มีหน่วย / ถ้าไม่มีน้ำหนัก แสดงการ์ดแบบเดิม */}
                    <div className="flex flex-col gap-1.5 mb-3 border-t border-slate-100 pt-3">
                       {item.weight ? (
                         <>
@@ -249,7 +280,6 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                                     เดิม: {item.current_stock} → <span className={scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}>{scanMode === 'receive' ? item.current_stock + item.amount : item.current_stock - item.amount}</span>
                                  </p>
                               </div>
-                              {/* 🌟 ถ้ามีน้ำหนัก ซ่อนหน่วยนับ / ถ้าไม่มี แสดงหน่วยนับตามปกติ */}
                               <div className="text-right shrink-0">
                                  <span className={`text-2xl font-black leading-none ${scanMode === 'receive' ? 'text-green-600' : 'text-red-600'}`}>{scanMode === 'receive' ? '+' : '-'}{item.amount}</span>
                                  {!item.weight && <p className="text-[10px] font-black text-slate-300 uppercase mt-1 leading-none">{item.unit}</p>}
@@ -258,9 +288,9 @@ export default function BatchScanner({ scanMode, activeUser, scanDelay, onClose,
                       ))}
                   </div>
                   <div className="flex gap-4 shrink-0">
-                      <button onClick={() => setShowBatchSummary(false)} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-100 uppercase text-xs">แก้ไขเพิ่ม</button>
+                      <button onClick={() => setShowBatchSummary(false)} disabled={isSaving} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-100 uppercase text-xs disabled:opacity-50">แก้ไขเพิ่ม</button>
                       <button onClick={handleFinalSave} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} disabled:opacity-50 active:scale-95 flex items-center justify-center gap-2`}>
-                        {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} ยืนยันบันทึกทั้งหมด
+                        {isSaving ? <Loader2 className="animate-spin" size={20}/> : <CheckCircle2 size={20}/>} {isSaving ? 'กำลังบันทึก...' : 'ยืนยันบันทึกทั้งหมด'}
                       </button>
                   </div>
               </div>
