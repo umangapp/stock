@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { supabase } from '@/lib/supabaseClient'
-import { X, Minus, Plus, AlertCircle, Package } from 'lucide-react' 
+import { X, Minus, Plus, AlertCircle, Package, Loader2 } from 'lucide-react' 
 
 const playScanSound = () => {
   const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -55,11 +55,12 @@ const SKUColored = ({ sku, prefix }: { sku: string; prefix: string }) => {
   );
 };
 
-export default function SingleScanner({ scanMode, activeUser, initialSKU, onClose, onRefresh }: any) {
+export default function SingleScanner({ scanMode, activeUser, initialSKU, scanDelay = 1000, onClose, onRefresh }: any) {
   const [selectedProduct, setSelectedProduct] = useState<any>(null)
   const [singleAmount, setSingleAmount] = useState(1)
   const [showActionModal, setShowActionModal] = useState(false)
   const [showSummaryModal, setShowSummaryModal] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const isScanLocked = useRef(false)
 
@@ -82,28 +83,69 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
 
   const handleScan = async (sku: string) => {
     if (isScanLocked.current && !initialSKU) return; 
+    isScanLocked.current = true; 
+
     const { data: p } = await supabase.from('products').select('*').ilike('sku_15_digits', sku.trim()).single();
-    if (!p) { alert("❌ ไม่พบข้อมูลสินค้ารหัสนี้ในระบบ"); isScanLocked.current = false; if(initialSKU) onClose(); return; }
     
-    if (scanMode === 'issue' && p.current_stock <= 0) {
-        playErrorSound(); alert(`❌ สต๊อก "${p.name}" เป็น 0 ไม่สามารถนำออกได้!`); 
-        if(initialSKU) onClose(); return;
+    if (!p) { 
+      alert("❌ ไม่พบข้อมูลสินค้ารหัสนี้ในระบบ"); 
+      setTimeout(() => { isScanLocked.current = false; }, scanDelay); 
+      if(initialSKU) onClose(); 
+      return; 
     }
     
-    isScanLocked.current = true;
+    if (scanMode === 'issue' && p.current_stock <= 0) {
+      playErrorSound(); 
+      alert(`❌ สต๊อก "${p.name}" เป็น 0 ไม่สามารถนำออกได้!`); 
+      setTimeout(() => { isScanLocked.current = false; }, scanDelay); 
+      if(initialSKU) onClose(); 
+      return;
+    }
+    
     playScanSound();
-    setSelectedProduct(p); setSingleAmount(1); setShowActionModal(true);
+    setSelectedProduct(p); 
+    setSingleAmount(1); 
+    setShowActionModal(true);
     await scannerRef.current?.pause();
   }
 
   const handleSave = async () => {
-    const isIssue = scanMode === 'issue';
-    const oldStock = selectedProduct.current_stock;
-    const newStock = isIssue ? oldStock - singleAmount : oldStock + singleAmount;
-    await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id);
-    await supabase.from('transactions').insert([{ product_id: selectedProduct.id, type: scanMode, amount: singleAmount, old_stock: oldStock, new_stock: newStock, created_by: activeUser }]);
-    onRefresh(); setShowSummaryModal(false); isScanLocked.current = false;
-    onClose(); 
+    if (isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const { data: freshProduct } = await supabase.from('products').select('current_stock').eq('id', selectedProduct.id).single();
+      const liveStock = freshProduct?.current_stock ?? selectedProduct.current_stock;
+
+      if (scanMode === 'issue' && liveStock < singleAmount) {
+        playErrorSound();
+        alert(`❌ สต๊อกไม่พอจ่าย! (คงเหลือในระบบ: ${liveStock})`);
+        setIsSaving(false);
+        return;
+      }
+
+      const isIssue = scanMode === 'issue';
+      const newStock = isIssue ? liveStock - singleAmount : liveStock + singleAmount;
+      
+      await supabase.from('products').update({ current_stock: newStock }).eq('id', selectedProduct.id);
+      await supabase.from('transactions').insert([{ 
+        product_id: selectedProduct.id, 
+        type: scanMode, 
+        amount: singleAmount, 
+        old_stock: liveStock, 
+        new_stock: newStock, 
+        created_by: activeUser 
+      }]);
+
+      onRefresh(); 
+      setShowSummaryModal(false); 
+      isScanLocked.current = false;
+      onClose(); 
+    } catch (e) {
+      alert("เกิดข้อผิดพลาดในการบันทึก");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -183,7 +225,12 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                     setShowActionModal(false); setShowSummaryModal(true); 
                 }} className={`w-full py-6 rounded-[2rem] font-black text-xl text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600 shadow-green-900/20' : 'bg-red-600 shadow-red-900/20'} active:scale-95 transition-all`}>ตรวจสอบรายการ</button>
                 
-                <button onClick={() => { setShowActionModal(false); isScanLocked.current = false; onClose(); }} className="mt-6 text-slate-300 font-black uppercase text-xs tracking-widest">ยกเลิก</button>
+                <button onClick={() => { 
+                  setShowActionModal(false); 
+                  isScanLocked.current = false; 
+                  scannerRef.current?.resume();
+                  onClose(); 
+                }} className="mt-6 text-slate-300 font-black uppercase text-xs tracking-widest">ยกเลิก</button>
              </div>
           </div>
       )}
@@ -205,7 +252,6 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                       <div className="flex justify-between border-b border-slate-100 pb-3"><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">น้ำหนัก</span><span className="font-black text-lg text-slate-800">{Number(selectedProduct.weight).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} กก.</span></div>
                     )}
                     
-                    {/* 🌟 เช็ก weight: ถ้ามีน้ำหนักใช้ "จำนวน" + ซ่อนหน่วย / ถ้าไม่มีใช้ "จำนวนสแกน" + แสดงหน่วย */}
                     <div className="flex justify-between border-b border-slate-100 pb-3">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                         {selectedProduct.weight ? 'จำนวน' : 'จำนวนสแกน'}
@@ -222,8 +268,11 @@ export default function SingleScanner({ scanMode, activeUser, initialSKU, onClos
                 </div>
 
                 <div className="flex gap-4">
-                    <button onClick={() => { setShowSummaryModal(false); setShowActionModal(true); }} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-50 uppercase text-[11px] shadow-sm">แก้ไข</button>
-                    <button onClick={handleSave} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} active:scale-95 transition-all`}>ยืนยันบันทึก</button>
+                    <button onClick={() => { setShowSummaryModal(false); setShowActionModal(true); }} disabled={isSaving} className="flex-1 py-5 rounded-3xl font-black text-slate-400 bg-slate-50 uppercase text-[11px] shadow-sm disabled:opacity-50">แก้ไข</button>
+                    <button onClick={handleSave} disabled={isSaving} className={`flex-[2] py-5 rounded-3xl font-black text-white shadow-xl ${scanMode === 'receive' ? 'bg-green-600' : 'bg-red-600'} active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}>
+                      {isSaving ? <Loader2 className="animate-spin" size={20}/> : null}
+                      {isSaving ? 'กำลังบันทึก...' : 'ยืนยันบันทึก'}
+                    </button>
                 </div>
              </div>
           </div>
