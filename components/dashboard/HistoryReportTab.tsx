@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Search, Calendar, User, RotateCcw, Clock, ChevronLeft, ChevronRight } from 'lucide-react'
 import SKUColoredAdmin from '@/components/SKUColored'
 
@@ -10,6 +10,10 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
   const [reportSearchUser, setReportSearchUser] = useState('')
   const [reportSearchType, setReportSearchType] = useState('all')
 
+  // 🌟 Ref สำหรับสั่งเปิดปฏิทินตอนกดที่ช่อง
+  const startDateRef = useRef<HTMLInputElement>(null)
+  const endDateRef = useRef<HTMLInputElement>(null)
+
   // 🌟 State สำหรับการแบ่งหน้า (Pagination)
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 50
@@ -17,8 +21,26 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
   // 🌟 ฟังก์ชันแปลง YYYY-MM-DD เป็น วัน/เดือน/ปี (DD/MM/YYYY)
   const formatDateToThai = (dateStr: string) => {
     if (!dateStr) return '';
-    const [y, m, d] = dateStr.split('-');
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
     return `${d}/${m}/${y}`;
+  };
+
+  const handleOpenStartDate = () => {
+    try {
+      startDateRef.current?.showPicker();
+    } catch (e) {
+      startDateRef.current?.focus();
+    }
+  };
+
+  const handleOpenEndDate = () => {
+    try {
+      endDateRef.current?.showPicker();
+    } catch (e) {
+      endDateRef.current?.focus();
+    }
   };
 
   // รีเซ็ตไปหน้า 1 เมื่อมีการเปลี่ยนตัวกรองค้นหา
@@ -84,7 +106,6 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
 
     return (
       <div className="flex items-center gap-1.5">
-        {/* ปุ่มหน้าก่อนหน้า */}
         <button
           onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
           disabled={safeCurrentPage === 1}
@@ -94,7 +115,6 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           <ChevronLeft size={16} />
         </button>
 
-        {/* ปุ่มหน้า 1 ถ้ากรณีอยู่ไกล */}
         {startPage > 1 && (
           <>
             <button
@@ -107,7 +127,6 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           </>
         )}
 
-        {/* ปุ่มตัวเลขหน้า */}
         {pageNumbers.map((page) => (
           <button
             key={page}
@@ -122,7 +141,6 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           </button>
         ))}
 
-        {/* ปุ่มหน้าสุดท้าย ถ้ากรณีอยู่ไกล */}
         {endPage < totalPages && (
           <>
             {endPage < totalPages - 1 && <span className="text-xs text-slate-400 px-0.5">...</span>}
@@ -135,7 +153,6 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           </>
         )}
 
-        {/* ปุ่มหน้าถัดไป */}
         <button
           onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
           disabled={safeCurrentPage === totalPages}
@@ -151,14 +168,13 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
   return (
     <div className="space-y-6 animate-in fade-in text-slate-800 no-print">
       
-      {/* 🌟 Header + สรุปจำนวน + Pagination มุมขวาบน */}
+      {/* Header + สรุปจำนวน + Pagination มุมขวาบน */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black uppercase italic tracking-tighter text-slate-900">รายงานประวัติการทำงาน</h2>
           <p className="text-xs text-slate-400 font-bold mt-1">ประวัติการสแกนเข้า สแกนออก และการ Import สต๊อกของผู้ใช้งานทั้งหมด</p>
         </div>
 
-        {/* ฝั่งมุมขวาบน */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 self-end sm:self-auto">
           <span className="bg-blue-50 text-blue-600 border border-blue-200 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
             แสดงผล {filteredReports.length > 0 ? startIndex + 1 : 0} - {Math.min(endIndex, filteredReports.length)} จาก {filteredReports.length} รายการ
@@ -183,42 +199,48 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
             />
           </div>
 
-          {/* 2. ตั้งแต่วันที่ */}
-          <div className="relative min-h-[42px]">
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16}/>
-            <input 
-              type="date" 
-              title="ตั้งแต่วันที่"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              value={reportStartDate}
-              onChange={(e) => setReportStartDate(e.target.value)}
-            />
-            <div className="w-full h-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-xs font-bold text-slate-700 flex items-center">
+          {/* 🌟 2. ตั้งแต่วันที่ (คลิกแล้วเปิดปฏิทินทันที) */}
+          <div 
+            onClick={handleOpenStartDate}
+            className="relative bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl cursor-pointer hover:border-blue-400 transition-all flex items-center min-h-[42px] select-none"
+          >
+            <Calendar className="absolute left-3.5 text-slate-400 pointer-events-none" size={16}/>
+            <div className="text-xs font-bold text-slate-700 w-full">
               {reportStartDate ? (
                 <span className="text-slate-900 font-black">{formatDateToThai(reportStartDate)}</span>
               ) : (
                 <span className="text-slate-400 font-bold">เริ่มต้น (วัน/เดือน/ปี)</span>
               )}
             </div>
+            <input 
+              ref={startDateRef}
+              type="date" 
+              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+              value={reportStartDate}
+              onChange={(e) => setReportStartDate(e.target.value)}
+            />
           </div>
 
-          {/* 3. ถึงวันที่ */}
-          <div className="relative min-h-[42px]">
-            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10" size={16}/>
-            <input 
-              type="date" 
-              title="ถึงวันที่"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              value={reportEndDate}
-              onChange={(e) => setReportEndDate(e.target.value)}
-            />
-            <div className="w-full h-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl text-xs font-bold text-slate-700 flex items-center">
+          {/* 🌟 3. ถึงวันที่ (คลิกแล้วเปิดปฏิทินทันที) */}
+          <div 
+            onClick={handleOpenEndDate}
+            className="relative bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl cursor-pointer hover:border-blue-400 transition-all flex items-center min-h-[42px] select-none"
+          >
+            <Calendar className="absolute left-3.5 text-slate-400 pointer-events-none" size={16}/>
+            <div className="text-xs font-bold text-slate-700 w-full">
               {reportEndDate ? (
                 <span className="text-slate-900 font-black">{formatDateToThai(reportEndDate)}</span>
               ) : (
                 <span className="text-slate-400 font-bold">ถึงวันที่ (วัน/เดือน/ปี)</span>
               )}
             </div>
+            <input 
+              ref={endDateRef}
+              type="date" 
+              className="absolute inset-0 w-full h-full opacity-0 pointer-events-none"
+              value={reportEndDate}
+              onChange={(e) => setReportEndDate(e.target.value)}
+            />
           </div>
 
           {/* 4. ผู้ดำเนินการ */}
@@ -342,7 +364,7 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
           </table>
         </div>
 
-        {/* 🌟 Pagination Controls มุมขวาล่างใต้ตาราง */}
+        {/* Pagination Controls มุมขวาล่างใต้ตาราง */}
         {totalPages > 1 && (
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-6 mt-2 border-t border-slate-100">
             <span className="text-xs font-bold text-slate-400">
