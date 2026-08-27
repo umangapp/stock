@@ -314,8 +314,18 @@ export default function AdminDashboard() {
       return acc;
   }, {});
 
-  if (loading) return <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">VERIFYING ACCESS...</div>
-
+if (loading) {
+  return (
+    <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">
+      VERIFYING ACCESS...
+    </div>
+  );
+}
+<style>{`
+  @media print {
+    /* print styles */
+  }
+`}</style>
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
       
