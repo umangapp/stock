@@ -5,10 +5,25 @@ import SKUColoredAdmin from '@/components/SKUColored'
 
 export default function HistoryReportTab({ transactions, userProfiles }: any) {
   const [reportSearchSku, setReportSearchSku] = useState('')
-  const [reportSearchDate, setReportSearchDate] = useState('')
+  const [reportStartDate, setReportStartDate] = useState('')
+  const [reportEndDate, setReportEndDate] = useState('')
   const [reportSearchUser, setReportSearchUser] = useState('')
   const [reportSearchType, setReportSearchType] = useState('all')
 
+  // 🌟 ฟังก์ชันเคลียร์ค่าทุกช่อง
+  const handleClearFilters = () => {
+    setReportSearchSku('');
+    setReportStartDate('');
+    setReportEndDate('');
+    setReportSearchUser('');
+    setReportSearchType('all');
+  };
+
+  const isFiltered = Boolean(
+    reportSearchSku || reportStartDate || reportEndDate || reportSearchUser || reportSearchType !== 'all'
+  );
+
+  // 🌟 กรองข้อมูลตามช่วงวันที่ Start - End และเงื่อนไขอื่นๆ
   const filteredReports = transactions.filter((log: any) => {
     const matchesSku = !reportSearchSku || 
       (log.products?.sku_15_digits || '').toLowerCase().includes(reportSearchSku.toLowerCase()) ||
@@ -16,14 +31,15 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
       (log.products?.prefix || '').toLowerCase().includes(reportSearchSku.toLowerCase());
 
     const logDateStr = log.created_at ? new Date(log.created_at).toISOString().split('T')[0] : '';
-    const matchesDate = !reportSearchDate || logDateStr === reportSearchDate;
+    const matchesStart = !reportStartDate || logDateStr >= reportStartDate;
+    const matchesEnd = !reportEndDate || logDateStr <= reportEndDate;
 
     const matchesUser = !reportSearchUser || 
       (log.created_by || '').toLowerCase() === reportSearchUser.toLowerCase();
 
     const matchesType = reportSearchType === 'all' || log.type === reportSearchType;
 
-    return matchesSku && matchesDate && matchesUser && matchesType;
+    return matchesSku && matchesStart && matchesEnd && matchesUser && matchesType;
   });
 
   return (
@@ -38,8 +54,11 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
         </span>
       </div>
 
+      {/* 🌟 แผงปุ่มค้นหาและ Filter */}
       <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          
+          {/* 1. ค้นหา SKU / ชื่อสินค้า */}
           <div className="relative">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16}/>
             <input 
@@ -51,16 +70,31 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
             />
           </div>
 
+          {/* 2. ตั้งแต่วันที่ */}
           <div className="relative">
             <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16}/>
             <input 
               type="date" 
+              title="ตั้งแต่วันที่"
               className="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:border-blue-500 text-xs font-bold text-slate-700"
-              value={reportSearchDate}
-              onChange={(e) => setReportSearchDate(e.target.value)}
+              value={reportStartDate}
+              onChange={(e) => setReportStartDate(e.target.value)}
             />
           </div>
 
+          {/* 3. ถึงวันที่ */}
+          <div className="relative">
+            <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16}/>
+            <input 
+              type="date" 
+              title="ถึงวันที่"
+              className="w-full bg-slate-50 border border-slate-200 p-3 pl-10 rounded-xl outline-none focus:border-blue-500 text-xs font-bold text-slate-700"
+              value={reportEndDate}
+              onChange={(e) => setReportEndDate(e.target.value)}
+            />
+          </div>
+
+          {/* 4. ผู้ดำเนินการ */}
           <div className="relative">
             <User className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16}/>
             <select 
@@ -75,6 +109,7 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
             </select>
           </div>
 
+          {/* 5. ประเภทธุรกรรม */}
           <div>
             <select 
               className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl outline-none focus:border-blue-500 text-xs font-bold text-slate-700 appearance-none cursor-pointer"
@@ -87,25 +122,31 @@ export default function HistoryReportTab({ transactions, userProfiles }: any) {
               <option value="import">IMPORT สต๊อก</option>
             </select>
           </div>
+
         </div>
 
-        {(reportSearchSku || reportSearchDate || reportSearchUser || reportSearchType !== 'all') && (
-          <div className="flex justify-end pt-1">
-            <button 
-              onClick={() => {
-                setReportSearchSku('');
-                setReportSearchDate('');
-                setReportSearchUser('');
-                setReportSearchType('all');
-              }}
-              className="text-xs font-black text-rose-500 hover:text-rose-600 flex items-center gap-1 active:scale-95 transition-all"
-            >
-              <RotateCcw size={14}/> ล้างตัวกรองทั้งหมด
-            </button>
+        {/* 🌟 แถบแสดงสถานะช่วงวันที่ + ปุ่มเคลียร์ทุกช่อง */}
+        <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+          <div className="text-[11px] text-slate-400 font-bold">
+            {(reportStartDate || reportEndDate) && (
+              <span>ช่วงวันที่: <strong className="text-slate-700">{reportStartDate || 'เริ่มต้น'}</strong> ถึง <strong className="text-slate-700">{reportEndDate || 'ปัจจุบัน'}</strong></span>
+            )}
           </div>
-        )}
+          <button 
+            onClick={handleClearFilters}
+            disabled={!isFiltered}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-sm ${
+              isFiltered 
+                ? 'bg-rose-50 text-rose-600 hover:bg-rose-100 border border-rose-200 active:scale-95 cursor-pointer' 
+                : 'bg-slate-100 text-slate-300 border border-slate-200 cursor-not-allowed opacity-50'
+            }`}
+          >
+            <RotateCcw size={14}/> เคลียร์ช่องค้นหาทั้งหมด
+          </button>
+        </div>
       </div>
 
+      {/* ตารางแสดงผลประวัติ */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
