@@ -11,7 +11,7 @@ import {
   Package, QrCode, LayoutDashboard, FileText, Users, Settings, Home, LogOut 
 } from 'lucide-react'
 
-// 🌟 Import 5 แท็บย่อยที่เราตัดแบ่ง
+// 🌟 Import 5 แท็บย่อยที่แยกไว้
 import InventoryTab from '@/components/dashboard/InventoryTab'
 import ActivityFeedTab from '@/components/dashboard/ActivityFeedTab'
 import HistoryReportTab from '@/components/dashboard/HistoryReportTab'
@@ -105,6 +105,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
+  // 🌟 ฟังก์ชัน Import Excel ตรวจจับโครงสร้างคอลัมน์อัตโนมัติ (Smart Dynamic Parser)
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -116,50 +117,79 @@ export default function AdminDashboard() {
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
-        const rows = jsonData.slice(1)
+        
+        if (!jsonData || jsonData.length < 2) {
+          alert('⚠️ ไฟล์ Excel ไม่มีข้อมูล');
+          return;
+        }
+
+        const headerRow = jsonData[0] || [];
+        const rows = jsonData.slice(1);
+        
+        // 🌟 ตรวจสอบอัตโนมัติว่าไฟล์มีคอลัมน์ "ชื่อสินค้าหลัก" ใน Col 1 หรือไม่
+        const col1Header = String(headerRow[1] || '').trim().toLowerCase();
+        const col2Header = String(headerRow[2] || '').trim().toLowerCase();
+        
+        let hasNameCol = col1Header.includes('ชื่อ') || col1Header.includes('name') || 
+                         col2Header.includes('ขนาด') || col2Header.includes('size');
+
+        // Fallback Check: ตรวจสอบโครงสร้างข้อมูลจากแถวแรก
+        if (!hasNameCol && rows.length > 0) {
+          const sampleCol2 = String(rows[0][2] || '').trim().toLowerCase();
+          if (sampleCol2.includes('x') || /\d/.test(sampleCol2)) {
+            hasNameCol = true;
+          }
+        }
+
+        const offset = hasNameCol ? 1 : 0;
         let hasValidationError = false;
         
         const importData = rows.map((row, index) => {
-          if (!row[0]) return null
+          if (!row[0]) return null;
           if (hasValidationError) return null;
           
           const prefix = String(row[0] || '').trim().toUpperCase(); 
           if (!prefix) return null;
 
           const masterItem = masterProducts.find((mp: any) => mp.prefix === prefix);
-          if (!masterItem) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: ไม่พบตัวย่อสินค้า "${prefix}" ในระบบมาสเตอร์! กรุณาเพิ่มมาสเตอร์สินค้าก่อนนำเข้า`);
-            hasValidationError = true; return null;
-          }
-          const productName = masterItem.name;
           
-          const sizeStr = String(row[1] || '').toLowerCase().trim(); 
+          let productName = '';
+          if (hasNameCol && String(row[1] || '').trim()) {
+            productName = String(row[1]).trim();
+          } else if (masterItem) {
+            productName = masterItem.name;
+          } else {
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: ไม่พบตัวย่อสินค้า "${prefix}" ในระบบมาสเตอร์! กรุณาเพิ่มมาสเตอร์สินค้าก่อนนำเข้า`);
+            hasValidationError = true; 
+            return null;
+          }
+          
+          const sizeStr = String(row[1 + offset] || '').toLowerCase().trim(); 
           const sizeParts = sizeStr.split('x');
           const hVal = sizeParts[0] ? sizeParts[0].trim() : '';
           const wVal = sizeParts[1] ? sizeParts[1].trim() : '';
           const lVal = sizeParts[2] ? sizeParts[2].trim() : '';
           
-          const formattedDate = parseExcelDate(row[2]); 
-          const runningVal = String(row[3] || '01').padStart(2, '0').slice(-2); 
-          const unitVal = String(row[4] || '').trim(); 
+          const formattedDate = parseExcelDate(row[2 + offset]); 
+          const runningVal = String(row[3 + offset] || '01').padStart(2, '0').slice(-2); 
+          const unitVal = String(row[4 + offset] || '').trim(); 
           
-          const colGSku = String(row[6] || '').trim().toUpperCase(); 
-          const colHSku = String(row[7] || '').trim().toUpperCase(); 
-          
+          const isKg = unitVal.includes('กก');
+
           let weightVal = null;
           let currentStock = 0;
           let manualSku = '';
           let safetyStock = 0;
 
-          if (colGSku.length >= 8) {
-            currentStock = Number(row[5] || 0); 
-            manualSku = colGSku;               
-            safetyStock = Number(row[7] || 0); 
+          if (isKg) {
+            weightVal = row[5 + offset] !== undefined && row[5 + offset] !== '' && row[5 + offset] !== null ? parseFloat(Number(row[5 + offset]).toFixed(2)) : null;
+            currentStock = Number(row[6 + offset] || 0); 
+            manualSku = String(row[7 + offset] || '').trim().toUpperCase();
+            safetyStock = Number(row[8 + offset] || 0); 
           } else {
-            weightVal = row[5] !== undefined && row[5] !== '' && row[5] !== null ? parseFloat(Number(row[5]).toFixed(2)) : null;
-            currentStock = Number(row[6] || 0); 
-            manualSku = colHSku;               
-            safetyStock = Number(row[8] || 0); 
+            currentStock = Number(row[5 + offset] || 0); 
+            manualSku = String(row[6 + offset] || '').trim().toUpperCase();
+            safetyStock = Number(row[7 + offset] || 0); 
           }
 
           if (!manualSku) {
@@ -174,14 +204,17 @@ export default function AdminDashboard() {
           }
 
           if (manualSku.length < 8) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าตัวย่อ "${prefix}" รหัส SKU สั้นเกินไป ยกเลิกการ Import ทันที`);
-            hasValidationError = true; return null;
+            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าตัวย่อ "${prefix}" รหัส SKU สั้นเกินไป (${manualSku}) ยกเลิกการ Import ทันที`);
+            hasValidationError = true; 
+            return null;
           }
+
           const paddingMatch = manualSku.match(/[X]+$/i);
           const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
           if (!/^\d{2}$/.test(coreSku.slice(-2))) {
             alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าชุด X ของ SKU สินค้า "${prefix}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
-            hasValidationError = true; return null;
+            hasValidationError = true; 
+            return null;
           }
 
           return { 
@@ -192,7 +225,7 @@ export default function AdminDashboard() {
             length: lVal ? parseFloat(lVal) : 0, 
             received_date: formattedDate, 
             unit: unitVal, 
-            weight: unitVal.includes('กก') ? weightVal : null,
+            weight: isKg ? weightVal : null,
             current_stock: currentStock, 
             sku_15_digits: manualSku,
             safety_stock: safetyStock 
