@@ -116,7 +116,8 @@ export default function InventoryTab({
                                       <span className="uppercase text-[11px] tracking-widest text-slate-400">LOT:</span> {l3.lot}
                                    </div>
                                    <div className="flex items-center gap-3">
-                                      <span className={`font-black ${l3.hasLowStock ? 'text-red-500' : 'text-slate-600'}`}>{l3.totalStock}</span>
+                                      {/* 🌟 จุดที่ 1: เพิ่มหน่วยนับระดับ LOT */}
+                                      <span className={`font-black ${l3.hasLowStock ? 'text-red-500' : 'text-slate-600'}`}>{l3.totalStock} <span className="text-xs text-slate-400 font-bold">{l1.unit}</span></span>
                                       <div className="text-slate-300">{expandedL3.includes(`${l1.name}-${l2.height}-${l3.lot}`) ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
                                    </div>
                                 </div>
@@ -140,7 +141,10 @@ export default function InventoryTab({
                                               </div>
                                             </div>
                                             <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
-                                               <p className={`font-black text-2xl leading-none ${isItemLow ? 'text-red-600' : 'text-slate-900'}`}>{item.current_stock}</p>
+                                               {/* 🌟 จุดที่ 2: เพิ่มหน่วยนับต่อท้ายตัวเลขสต๊อกรายชิ้น */}
+                                               <p className={`font-black text-2xl leading-none ${isItemLow ? 'text-red-600' : 'text-slate-900'}`}>
+                                                  {item.current_stock} <span className="text-xs text-slate-400 font-bold">{item.unit || l1.unit}</span>
+                                               </p>
                                                <div className="flex gap-2 shrink-0">
                                                   <button onClick={() => { 
                                                     const sku = item.sku_15_digits || '';
