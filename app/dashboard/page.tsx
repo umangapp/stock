@@ -105,7 +105,7 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชัน Import Excel แบบล็อกตำแหน่งคอลัมน์แม่นยำ ไม่ขึ้นกับหน่วยนับ
+  // 🌟 ฟังก์ชัน Import Excel อ่านค่า Col G (จำนวน) เข้า weightVal สำหรับทุกหน่วยสินค้า
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
             length: lVal ? parseFloat(lVal) : 0, 
             received_date: formattedDate, 
             unit: unitVal, 
-            weight: weightVal,
+            weight: weightVal, // 🌟 เซฟค่า Col G (จำนวน) เข้าฟิลด์ weight สำหรับทุกหน่วยสินค้า
             current_stock: currentStock, 
             sku_15_digits: manualSku,
             safety_stock: safetyStock 
@@ -253,11 +253,8 @@ export default function AdminDashboard() {
       width: Number(newProduct.width) || 0, length: Number(newProduct.length) || 0,
       received_date: newProduct.received_date, unit: newProduct.unit,
       current_stock: Number(newProduct.current_stock) || 0, safety_stock: Number(newProduct.safety_stock) || 0,
-      sku_15_digits: newProduct.sku_15_digits
-    }
-
-    if (newProduct.unit?.includes('กก')) {
-      dbPayload.weight = newProduct.weight !== '' ? parseFloat(Number(newProduct.weight).toFixed(2)) : null;
+      sku_15_digits: newProduct.sku_15_digits,
+      weight: newProduct.weight !== '' ? parseFloat(Number(newProduct.weight).toFixed(2)) : null
     }
 
     const { error } = await supabase.from('products').insert([dbPayload])
@@ -274,11 +271,8 @@ export default function AdminDashboard() {
       width: Number(editingProduct.width) || 0, length: Number(editingProduct.length) || 0,
       received_date: editingProduct.received_date, unit: editingProduct.unit,
       current_stock: Number(editingProduct.current_stock) || 0, safety_stock: Number(editingProduct.safety_stock) || 0,
-      sku_15_digits: editingProduct.sku_15_digits
-    }
-
-    if (editingProduct.unit?.includes('กก')) {
-      dbPayload.weight = editingProduct.weight !== '' && editingProduct.weight !== null ? parseFloat(Number(editingProduct.weight).toFixed(2)) : null;
+      sku_15_digits: editingProduct.sku_15_digits,
+      weight: editingProduct.weight !== '' && editingProduct.weight !== null ? parseFloat(Number(editingProduct.weight).toFixed(2)) : null
     }
 
     const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
