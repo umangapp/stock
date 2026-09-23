@@ -116,7 +116,6 @@ export default function InventoryTab({
                                       <span className="uppercase text-[11px] tracking-widest text-slate-400">LOT:</span> {l3.lot}
                                    </div>
                                    <div className="flex items-center gap-3">
-                                      {/* 🌟 จุดที่ 1: เพิ่มหน่วยนับระดับ LOT */}
                                       <span className={`font-black ${l3.hasLowStock ? 'text-red-500' : 'text-slate-600'}`}>{l3.totalStock} <span className="text-xs text-slate-400 font-bold">{l1.unit}</span></span>
                                       <div className="text-slate-300">{expandedL3.includes(`${l1.name}-${l2.height}-${l3.lot}`) ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</div>
                                    </div>
@@ -134,14 +133,20 @@ export default function InventoryTab({
                                               <div className="mb-1"><SKUColoredAdmin sku={item.sku_15_digits} prefix={item.prefix} /></div>
                                               <div className="flex flex-wrap items-center gap-2 mt-2">
                                                   <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">ขนาด {item.height}x{item.width}x{item.length}</span>
-                                                  {item.weight && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded uppercase border border-amber-200">น้ำหนัก: {item.weight} กก.</span>}
+                                                  
+                                                  {/* 🌟 ป้ายสีเหลืองแสดง "จำนวน: [ค่าใน Col G] [หน่วยนับจริง]" */}
+                                                  {item.weight !== null && item.weight !== undefined && (
+                                                    <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded uppercase border border-amber-200">
+                                                      จำนวน: {item.weight} {item.unit || l1.unit}
+                                                    </span>
+                                                  )}
+                                                  
                                                   <span className={`text-[10px] font-black px-2 py-0.5 rounded uppercase ${isItemLow ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
                                                     {isItemLow ? `⚠️ ต่ำกว่า Safety (${item.safety_stock})` : `Safety: ${item.safety_stock || 0}`}
                                                   </span>
                                               </div>
                                             </div>
                                             <div className="flex items-center gap-3 w-full sm:w-auto justify-between">
-                                               {/* 🌟 จุดที่ 2: เพิ่มหน่วยนับต่อท้ายตัวเลขสต๊อกรายชิ้น */}
                                                <p className={`font-black text-2xl leading-none ${isItemLow ? 'text-red-600' : 'text-slate-900'}`}>
                                                   {item.current_stock} <span className="text-xs text-slate-400 font-bold">{item.unit || l1.unit}</span>
                                                </p>
