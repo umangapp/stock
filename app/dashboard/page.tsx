@@ -13,7 +13,7 @@ import {
 
 // 🌟 Import แท็บย่อยทั้งหมดจาก components/dashboard/
 import InventoryTab from '@/components/dashboard/InventoryTab'
-import ExecutiveReportTab from './executive-report'
+import ExecutiveReportTab from '@/components/dashboard/executive-report'
 import ActivityFeedTab from '@/components/dashboard/ActivityFeedTab'
 import HistoryReportTab from '@/components/dashboard/HistoryReportTab'
 import UserManagementTab from '@/components/dashboard/UserManagementTab'
