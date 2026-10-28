@@ -1,11 +1,88 @@
 'use client'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { TrendingUp, PackageMinus, PackagePlus, AlertCircle, Award, Calendar } from 'lucide-react'
 
-export default function ExecutiveReportTab() {
+export default function ExecutiveReportTab({ transactions = [], products = [] }: { transactions: any[], products: any[] }) {
   const [period, setPeriod] = useState('1m')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+
+  // 1. คำนวณช่วงวันที่ต้องการกรอง
+  const filteredTransactions = useMemo(() => {
+    const now = new Date()
+    let filterStart = new Date(0)
+    let filterEnd = new Date()
+
+    if (period === '1m') filterStart.setMonth(now.getMonth() - 1)
+    else if (period === '3m') filterStart.setMonth(now.getMonth() - 3)
+    else if (period === '6m') filterStart.setMonth(now.getMonth() - 6)
+    else if (period === '12m') filterStart.setFullYear(now.getFullYear() - 1)
+    else if (period === 'custom' && startDate && endDate) {
+      filterStart = new Date(startDate)
+      filterEnd = new Date(endDate)
+      filterEnd.setHours(23, 59, 59, 999)
+    }
+
+    return transactions.filter(t => {
+      const tDate = new Date(t.created_at)
+      return tDate >= filterStart && tDate <= filterEnd
+    })
+  }, [transactions, period, startDate, endDate])
+
+  // 2. คำนวณตัวเลข KPI
+  const kpi = useMemo(() => {
+    const totalStock = products.reduce((sum, p) => sum + (Number(p.current_stock) || 0), 0)
+    const lowStockCount = products.filter(p => (Number(p.current_stock) || 0) < (Number(p.safety_stock) || 0)).length
+    
+    let totalIn = 0
+    let totalOut = 0
+    const itemOutCount: Record<string, { name: string, count: number, prefix: string }> = {}
+
+    filteredTransactions.forEach(t => {
+      const amount = Number(t.amount) || 0
+      if (t.type === 'receive' || t.type === 'import') {
+        totalIn += amount
+      } else if (t.type === 'issue') {
+        totalOut += amount
+        if (t.products) {
+          const sku = t.products.sku_15_digits || 'Unknown'
+          if (!itemOutCount[sku]) {
+            itemOutCount[sku] = { 
+              name: t.products.name || sku, 
+              prefix: t.products.prefix || '',
+              count: 0 
+            }
+          }
+          itemOutCount[sku].count += amount
+        }
+      }
+    })
+
+    // หาแชมป์เบิกจ่ายสูงสุด
+    let topItem = { name: 'ไม่มีข้อมูล', prefix: '-', count: 0 }
+    Object.values(itemOutCount).forEach(item => {
+      if (item.count > topItem.count) topItem = item
+    })
+
+    return { totalStock, lowStockCount, totalIn, totalOut, topItem }
+  }, [products, filteredTransactions])
+
+  // 3. คำนวณสัดส่วนกลุ่มสินค้า (Breakdown)
+  const breakdown = useMemo(() => {
+    const total = kpi.totalStock || 1 // กันหาร 0
+    const groups: Record<string, number> = {}
+    products.forEach(p => {
+      const prefix = p.prefix || 'OTHER'
+      groups[prefix] = (groups[prefix] || 0) + (Number(p.current_stock) || 0)
+    })
+    
+    return Object.entries(groups)
+      .map(([prefix, count]) => ({ prefix, count, percent: Math.round((count / total) * 100) }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 4) // เอาแค่ 4 อันดับแรก
+  }, [products, kpi.totalStock])
+
+  const colors = ['bg-amber-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500']
 
   return (
     <div className="space-y-6 animate-in fade-in no-print">
@@ -60,7 +137,7 @@ export default function ExecutiveReportTab() {
             <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><TrendingUp size={18}/></div>
           </div>
           <div>
-            <h3 className="text-3xl font-black text-slate-900">45,230</h3>
+            <h3 className="text-3xl font-black text-slate-900">{kpi.totalStock.toLocaleString()}</h3>
             <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block mt-2">รวมทุกหน่วยนับ</p>
           </div>
         </div>
@@ -71,8 +148,8 @@ export default function ExecutiveReportTab() {
             <div className="p-2 bg-red-50 text-red-600 rounded-xl"><PackageMinus size={18}/></div>
           </div>
           <div>
-            <h3 className="text-3xl font-black text-slate-900">1,420</h3>
-            <p className="text-[10px] font-bold text-slate-400 mt-2">รายการที่เบิกในช่วงเวลานี้</p>
+            <h3 className="text-3xl font-black text-slate-900">{kpi.totalOut.toLocaleString()}</h3>
+            <p className="text-[10px] font-bold text-slate-400 mt-2">ตามช่วงเวลาที่กรอง</p>
           </div>
         </div>
 
@@ -82,8 +159,8 @@ export default function ExecutiveReportTab() {
             <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl"><PackagePlus size={18}/></div>
           </div>
           <div>
-            <h3 className="text-3xl font-black text-slate-900">2,150</h3>
-            <p className="text-[10px] font-bold text-slate-400 mt-2">รายการที่รับในช่วงเวลานี้</p>
+            <h3 className="text-3xl font-black text-slate-900">{kpi.totalIn.toLocaleString()}</h3>
+            <p className="text-[10px] font-bold text-slate-400 mt-2">ตามช่วงเวลาที่กรอง</p>
           </div>
         </div>
 
@@ -93,7 +170,7 @@ export default function ExecutiveReportTab() {
             <div className="p-2 bg-amber-50 text-amber-600 rounded-xl"><AlertCircle size={18}/></div>
           </div>
           <div>
-            <h3 className="text-3xl font-black text-red-600 animate-pulse">12</h3>
+            <h3 className="text-3xl font-black text-red-600 animate-pulse">{kpi.lowStockCount}</h3>
             <p className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-1 rounded inline-block mt-2 border border-red-100">รายการที่ต่ำกว่า Safety</p>
           </div>
         </div>
@@ -105,92 +182,42 @@ export default function ExecutiveReportTab() {
               <p className="text-sm font-bold text-emerald-100">สินค้าเบิกจ่ายสูงสุด</p>
               <div className="p-2 bg-emerald-600 text-white rounded-xl"><Award size={18}/></div>
             </div>
-            <h3 className="text-2xl font-black text-white leading-tight">กระดาษหลอดย่น</h3>
-            <p className="text-emerald-200 text-xs font-bold mt-1">CT 4x6x1000</p>
-            <p className="text-[10px] font-black text-emerald-900 bg-emerald-400 px-2 py-1 rounded inline-block mt-3 shadow-sm">เบิกออก 450 เส้น</p>
+            <h3 className="text-2xl font-black text-white leading-tight truncate">{kpi.topItem.name}</h3>
+            <p className="text-emerald-200 text-xs font-bold mt-1">กลุ่ม {kpi.topItem.prefix}</p>
+            <p className="text-[10px] font-black text-emerald-900 bg-emerald-400 px-2 py-1 rounded inline-block mt-3 shadow-sm">เบิกออก {kpi.topItem.count.toLocaleString()} ครั้ง</p>
           </div>
         </div>
       </div>
 
       {/* 3. Charts & Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm lg:col-span-2">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h3 className="text-lg font-black text-slate-800">แนวโน้มความเคลื่อนไหว (Movement Trend)</h3>
-              <p className="text-xs font-bold text-slate-400">แสดงปริมาณรับเข้า และ เบิกจ่าย</p>
-            </div>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button className="px-3 py-1.5 text-xs font-bold bg-white shadow-sm rounded-lg text-slate-800">ยอดเบิกจ่าย</button>
-              <button className="px-3 py-1.5 text-xs font-bold text-slate-500 rounded-lg hover:text-slate-700">ยอดรับเข้า</button>
-            </div>
-          </div>
-          <div className="h-64 flex items-end justify-between gap-2 border-b border-slate-100 pb-2 pt-4">
-            {[40, 70, 45, 90, 65, 30, 85, 100, 50, 75, 40, 60, 80, 55].map((h, i) => (
-              <div key={i} className="w-full bg-emerald-100 hover:bg-emerald-500 transition-all rounded-t-md relative group cursor-pointer" style={{ height: `${h}%` }}>
-                <div className="opacity-0 group-hover:opacity-100 absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded pointer-events-none z-10">
-                  {h * 10}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-between mt-3 text-[10px] font-bold text-slate-400">
-            <span>เริ่มต้น</span>
-            <span>กลางรอบ</span>
-            <span>สิ้นสุด</span>
-          </div>
+        <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm lg:col-span-2 flex flex-col justify-center items-center text-slate-400">
+             {/* ซ่อนกราฟแท่งไว้ชั่วคราว รอต่อไลบรารีกราฟจริง */}
+             <TrendingUp size={48} className="mb-2 opacity-20" />
+             <p className="text-sm font-bold">พื้นที่สำหรับกราฟสรุปรายวัน</p>
         </div>
 
         <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm h-full">
           <div className="mb-6">
             <h3 className="text-lg font-black text-slate-800">สัดส่วนสต๊อก (Stock Breakdown)</h3>
-            <p className="text-xs font-bold text-slate-400">แยกตามกลุ่มสินค้า</p>
+            <p className="text-xs font-bold text-slate-400">แยกตามกลุ่ม Prefix สูงสุด</p>
           </div>
           
           <div className="space-y-6 mt-4">
-            <div>
-              <div className="flex justify-between text-sm font-bold mb-2">
-                <span className="text-slate-700 flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> กระดาษหลอดย่น (CT)</span>
-                <span className="text-slate-500">52%</span>
+            {breakdown.map((item, index) => (
+              <div key={item.prefix}>
+                <div className="flex justify-between text-sm font-bold mb-2">
+                  <span className="text-slate-700 flex items-center gap-2"><div className={`w-2.5 h-2.5 rounded-full ${colors[index % colors.length]}`}></div> กลุ่ม {item.prefix}</span>
+                  <span className="text-slate-500">{item.percent}%</span>
+                </div>
+                <div className="w-full bg-slate-100 rounded-full h-2.5">
+                  <div className={`${colors[index % colors.length]} h-2.5 rounded-full`} style={{ width: `${item.percent}%` }}></div>
+                </div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div className="bg-amber-500 h-2.5 rounded-full" style={{ width: '52%' }}></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between text-sm font-bold mb-2">
-                <span className="text-slate-700 flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div> กระดาษฉนวน (PP)</span>
-                <span className="text-slate-500">28%</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: '28%' }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm font-bold mb-2">
-                <span className="text-slate-700 flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div> ไม้รอง (WD)</span>
-                <span className="text-slate-500">12%</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div className="bg-emerald-500 h-2.5 rounded-full" style={{ width: '12%' }}></div>
-              </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between text-sm font-bold mb-2">
-                <span className="text-slate-700 flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div> อื่นๆ (Others)</span>
-                <span className="text-slate-500">8%</span>
-              </div>
-              <div className="w-full bg-slate-100 rounded-full h-2.5">
-                <div className="bg-purple-500 h-2.5 rounded-full" style={{ width: '8%' }}></div>
-              </div>
-            </div>
+            ))}
+            {breakdown.length === 0 && <p className="text-xs font-bold text-slate-400">ไม่มีข้อมูลสต๊อก</p>}
           </div>
         </div>
-
       </div>
     </div>
   )
