@@ -8,11 +8,12 @@ import BarcodePrintView from '@/components/BarcodePrintView'
 import ProductModal from '@/components/ProductModal'
 import { parseExcelDate, parseDateToYYMMDD, validateSKU } from '@/lib/productUtils'
 import { 
-  Package, QrCode, LayoutDashboard, FileText, Users, Settings, Home, LogOut 
+  Package, QrCode, LayoutDashboard, FileText, Users, Settings, Home, LogOut, BarChart3 
 } from 'lucide-react'
 
-// 🌟 Import 5 แท็บย่อยจาก components/dashboard/
+// 🌟 Import แท็บย่อยทั้งหมดจาก components/dashboard/
 import InventoryTab from '@/components/dashboard/InventoryTab'
+import ExecutiveReportTab from '@/components/dashboard/ExecutiveReportTab'
 import ActivityFeedTab from '@/components/dashboard/ActivityFeedTab'
 import HistoryReportTab from '@/components/dashboard/HistoryReportTab'
 import UserManagementTab from '@/components/dashboard/UserManagementTab'
@@ -105,7 +106,6 @@ export default function AdminDashboard() {
 
   const handleImportClick = () => fileInputRef.current?.click()
 
-  // 🌟 ฟังก์ชัน Import Excel อ่านค่า Col G (จำนวน) เข้า weightVal สำหรับทุกหน่วยสินค้า
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -169,225 +169,4 @@ export default function AdminDashboard() {
           const rawWeight = row[5 + offset];
           let weightVal = null;
           if (rawWeight !== undefined && rawWeight !== '' && rawWeight !== null && !isNaN(Number(rawWeight))) {
-            weightVal = parseFloat(Number(rawWeight).toFixed(2));
-          }
-
-          const currentStock = Number(row[6 + offset] || 0); 
-          let manualSku = String(row[7 + offset] || '').trim().toUpperCase();
-          const safetyStock = Number(row[8 + offset] || 0); 
-
-          if (!manualSku) {
-            const hClean = hVal.replace(/\./g, '');
-            const wClean = wVal.replace(/\./g, '').substring(0, 2);
-            const lClean = lVal.replace(/\./g, '').substring(0, 2);
-            const lotFormatted = parseDateToYYMMDD(formattedDate);
-            
-            let coreSku = `${prefix}${hClean}${wClean}${lClean}${lotFormatted}`;
-            if (coreSku.length < 6) coreSku = coreSku.padEnd(6, 'X');
-            manualSku = `${coreSku}${runningVal}`;
-          }
-
-          if (manualSku.length < 8) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: สินค้าตัวย่อ "${prefix}" รหัส SKU สั้นเกินไป (${manualSku}) ยกเลิกการ Import ทันที`);
-            hasValidationError = true; 
-            return null;
-          }
-
-          const paddingMatch = manualSku.match(/[X]+$/i);
-          const coreSku = paddingMatch ? manualSku.slice(0, -paddingMatch[0].length) : manualSku;
-          if (!/^\d{2}$/.test(coreSku.slice(-2))) {
-            alert(`⚠️ ข้อผิดพลาดที่บรรทัด ${index + 2}: รหัส 2 หลักหน้าชุด X ของ SKU สินค้า "${prefix}" ต้องเป็นตัวเลขเท่านั้น ยกเลิกการ Import ทันที`);
-            hasValidationError = true; 
-            return null;
-          }
-
-          return { 
-            name: productName, 
-            prefix: prefix, 
-            height: hVal ? parseFloat(hVal) : 0, 
-            width: wVal ? parseFloat(wVal) : 0, 
-            length: lVal ? parseFloat(lVal) : 0, 
-            received_date: formattedDate, 
-            unit: unitVal, 
-            weight: weightVal, // 🌟 เซฟค่า Col G (จำนวน) เข้าฟิลด์ weight สำหรับทุกหน่วยสินค้า
-            current_stock: currentStock, 
-            sku_15_digits: manualSku,
-            safety_stock: safetyStock 
-          }
-        }).filter(Boolean)
-        
-        if (hasValidationError) return;
-        
-        if (importData.length > 0) {
-          const { data: savedProducts, error } = await supabase.from('products').upsert(importData as any, { onConflict: 'sku_15_digits' }).select()
-          if (error) throw error
-
-          if (savedProducts && savedProducts.length > 0) {
-            const importLogs = savedProducts.map((sp: any) => ({
-              product_id: sp.id,
-              type: 'import',
-              amount: sp.current_stock,
-              old_stock: 0,
-              new_stock: sp.current_stock,
-              created_by: activeUser || 'ADMIN (IMPORT)'
-            }));
-            await supabase.from('transactions').insert(importLogs);
-          }
-
-          alert(`✅ ประมวลผลและนำเข้าสต๊อกสินค้าสำเร็จ ${importData.length} รายการ`); 
-          fetchData();
-        }
-      } catch (err: any) { alert("❌ การนำเข้าผิดพลาด: " + err.message) }
-      
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-    reader.readAsArrayBuffer(file)
-  }
-
-  const handleAddProduct = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateSKU(newProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
-    
-    const dbPayload: any = {
-      name: newProduct.name, prefix: newProduct.prefix, height: Number(newProduct.height) || 0,
-      width: Number(newProduct.width) || 0, length: Number(newProduct.length) || 0,
-      received_date: newProduct.received_date, unit: newProduct.unit,
-      current_stock: Number(newProduct.current_stock) || 0, safety_stock: Number(newProduct.safety_stock) || 0,
-      sku_15_digits: newProduct.sku_15_digits,
-      weight: newProduct.weight !== '' ? parseFloat(Number(newProduct.weight).toFixed(2)) : null
-    }
-
-    const { error } = await supabase.from('products').insert([dbPayload])
-    if (!error) { setIsAddModalOpen(false); fetchData(); } 
-    else { alert(error.code === '23505' ? "❌ รหัส SKU นี้มีอยู่ในระบบแล้วครับ" : `❌ ผิดพลาด: ${error.message}`); }
-  }
-
-  const handleUpdateProduct = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!validateSKU(editingProduct.sku_15_digits)) { alert("⚠️ บันทึกไม่สำเร็จ: รูปแบบรหัส SKU ไม่ถูกต้องครับ"); return; }
-    
-    const dbPayload: any = {
-      name: editingProduct.name, prefix: editingProduct.prefix, height: Number(editingProduct.height) || 0,
-      width: Number(editingProduct.width) || 0, length: Number(editingProduct.length) || 0,
-      received_date: editingProduct.received_date, unit: editingProduct.unit,
-      current_stock: Number(editingProduct.current_stock) || 0, safety_stock: Number(editingProduct.safety_stock) || 0,
-      sku_15_digits: editingProduct.sku_15_digits,
-      weight: editingProduct.weight !== '' && editingProduct.weight !== null ? parseFloat(Number(editingProduct.weight).toFixed(2)) : null
-    }
-
-    const { error } = await supabase.from('products').update(dbPayload).eq('id', editingProduct.id)
-    if (!error) { setIsEditModalOpen(false); fetchData(); } 
-    else { alert(`❌ ไม่สามารถอัปเดตได้: ${error.message}`); }
-  }
-
-  const deleteProduct = async (id: string) => {
-    if (!confirm("⚠️ ยืนยันการลบ?")) return;
-    const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) alert(`❌ ไม่สามารถลบได้เนื่องจาก: สินค้านี้มีประวัติการสแกนผูกอยู่ในระบบครับ`);
-    else fetchData();
-  }
-
-  if (loading) return <div className="h-screen flex items-center justify-center text-blue-600 font-black italic">VERIFYING ACCESS...</div>
-
-  return (
-    <div className="flex flex-col h-screen bg-gray-100 lg:flex-row overflow-hidden font-sans text-slate-900">
-      
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          main { padding: 0 !important; overflow: visible !important; }
-          .print-area { display: block !important; width: 210mm; background: white; }
-          .sticker-page { 
-            display: flex !important; flex-wrap: wrap !important; gap: 4mm !important;
-            align-content: flex-start !important; padding: 6mm 5mm !important;
-            width: 210mm !important; min-height: 297mm !important; 
-            page-break-after: always !important; box-sizing: border-box !important; background-color: #ffffff !important;
-          }
-        }
-        input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; transition: 0.2s; }
-        input[type="date"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
-      `}</style>
-
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx, .xls, .csv" className="hidden" />
-      
-      {/* Sidebar Navigation */}
-      <nav className="w-full lg:w-72 bg-slate-900 text-white p-4 lg:p-6 flex flex-col gap-4 shrink-0 z-20 shadow-2xl no-print">
-        <div className="flex justify-between items-start lg:flex-col lg:gap-6">
-          <div className="mb-2 lg:mb-0">
-              <h1 className="text-xl lg:text-2xl text-blue-400 font-black italic uppercase tracking-tighter leading-none">Umang Admin</h1>
-              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Version {appVersion}</p>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <button onClick={() => router.push('/')} className="p-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-2xl transition-all active:scale-95 shadow-sm" title="กลับหน้าเมนูหลัก"><Home size={22} /></button>
-            <button onClick={() => { if(confirm("ยืนยันการออกจากระบบ?")) { supabase.auth.signOut().then(() => router.push('/login')) } }} className="p-3 bg-red-950/30 hover:bg-red-900/40 text-red-400 border border-red-900/30 rounded-2xl transition-all active:scale-95 shadow-sm" title="ออกจากระบบ"><LogOut size={22} /></button>
-          </div>
-        </div>
-
-        <div className="flex lg:flex-col flex-1 gap-2 overflow-x-auto pb-2 lg:pb-0">
-          {[
-            { id: 'inventory', label: 'สต๊อกสินค้า', icon: Package },
-            { id: 'barcode', label: 'สร้างบาร์โค้ด', icon: QrCode },
-            { id: 'dashboard', label: 'ภาพรวมระบบ', icon: LayoutDashboard },
-            { id: 'reports', label: 'รายงานประวัติ', icon: FileText },
-            { id: 'users', label: 'จัดการผู้ใช้งาน', icon: Users },
-            { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
-          ].map((item) => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex items-center gap-3 px-5 py-4 rounded-3xl text-sm font-bold shrink-0 transition-all ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-white/5'}`}>
-              <item.icon size={20} /> <span className="whitespace-nowrap">{item.label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
-
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
-        {activeTab === 'inventory' && (
-          <InventoryTab 
-            products={products} searchQuery={searchQuery} setSearchQuery={setSearchQuery}
-            showLowStockOnly={showLowStockOnly} setShowLowStockOnly={setShowLowStockOnly}
-            handleImportClick={handleImportClick} setNewProduct={setNewProduct}
-            setIsAddModalOpen={setIsAddModalOpen} setEditingProduct={setEditingProduct}
-            setIsEditModalOpen={setIsEditModalOpen} deleteProduct={deleteProduct}
-          />
-        )}
-
-        {activeTab === 'barcode' && <BarcodePrintView products={products} />}
-
-        {activeTab === 'dashboard' && <ActivityFeedTab transactions={transactions} />}
-
-        {activeTab === 'reports' && <HistoryReportTab transactions={transactions} userProfiles={userProfiles} />}
-
-        {activeTab === 'users' && (
-          <UserManagementTab 
-            userProfiles={userProfiles} 
-            handleUpdateUserRole={handleUpdateUserRole} 
-            handleUpdateUserName={handleUpdateUserName} 
-          />
-        )}
-
-        {activeTab === 'settings' && (
-          <SystemSettingsTab 
-            newVersionInput={newVersionInput} setNewVersionInput={setNewVersionInput}
-            scanDelay={scanDelay} setScanDelay={setScanDelay} updateSettings={updateSettings}
-            inputName={inputName} setInputName={setInputName} inputPrefix={inputPrefix}
-            setInputPrefix={setInputPrefix} masterProducts={masterProducts} fetchData={fetchData}
-            inputUnit={inputUnit} setInputUnit={setInputUnit} masterUnits={masterUnits}
-          />
-        )}
-      </main>
-
-      <ProductModal 
-        isOpen={isAddModalOpen || isEditModalOpen}
-        isEditModal={isEditModalOpen}
-        onClose={() => { setIsAddModalOpen(false); setIsEditModalOpen(false); }}
-        onSubmit={isAddModalOpen ? handleAddProduct : handleUpdateProduct}
-        productData={isAddModalOpen ? newProduct : editingProduct}
-        setProductData={isAddModalOpen ? setNewProduct : setEditingProduct}
-        masterProducts={masterProducts}
-        masterUnits={masterUnits}
-      />
-      
-    </div>
-  )
-}
+            weightVal = parseFloat(Number
