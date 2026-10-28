@@ -1,16 +1,17 @@
 'use client'
 import { useState, useMemo } from 'react'
 import { TrendingUp, PackageMinus, PackagePlus, AlertCircle, Award, Calendar } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 
 export default function ExecutiveReportTab({ transactions = [], products = [] }: { transactions: any[], products: any[] }) {
   const [period, setPeriod] = useState('1m')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // 1. คำนวณช่วงวันที่ต้องการกรอง
+  // 1. กรองข้อมูล Transactions ตามช่วงเวลา
   const filteredTransactions = useMemo(() => {
     const now = new Date()
-    let filterStart = new Date(0)
+    let filterStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     let filterEnd = new Date()
 
     if (period === '1m') filterStart.setMonth(now.getMonth() - 1)
@@ -26,10 +27,10 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
     return transactions.filter(t => {
       const tDate = new Date(t.created_at)
       return tDate >= filterStart && tDate <= filterEnd
-    })
+    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) // เรียงใหม่สุดขึ้นก่อนสำหรับตาราง
   }, [transactions, period, startDate, endDate])
 
-  // 2. คำนวณตัวเลข KPI
+  // 2. คำนวณ KPI
   const kpi = useMemo(() => {
     const totalStock = products.reduce((sum, p) => sum + (Number(p.current_stock) || 0), 0)
     const lowStockCount = products.filter(p => (Number(p.current_stock) || 0) < (Number(p.safety_stock) || 0)).length
@@ -47,18 +48,13 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
         if (t.products) {
           const sku = t.products.sku_15_digits || 'Unknown'
           if (!itemOutCount[sku]) {
-            itemOutCount[sku] = { 
-              name: t.products.name || sku, 
-              prefix: t.products.prefix || '',
-              count: 0 
-            }
+            itemOutCount[sku] = { name: t.products.name || sku, prefix: t.products.prefix || '', count: 0 }
           }
           itemOutCount[sku].count += amount
         }
       }
     })
 
-    // หาแชมป์เบิกจ่ายสูงสุด
     let topItem = { name: 'ไม่มีข้อมูล', prefix: '-', count: 0 }
     Object.values(itemOutCount).forEach(item => {
       if (item.count > topItem.count) topItem = item
@@ -67,9 +63,35 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
     return { totalStock, lowStockCount, totalIn, totalOut, topItem }
   }, [products, filteredTransactions])
 
-  // 3. คำนวณสัดส่วนกลุ่มสินค้า (Breakdown)
+  // 3. เตรียมข้อมูลสำหรับกราฟแท่งรายวัน
+  const chartData = useMemo(() => {
+    const grouped: Record<string, { dateStr: string, timestamp: number, ยอดรับเข้า: number, ยอดเบิกจ่าย: number }> = {}
+    
+    // เราจะใช้ filteredTransactions ในการรวมยอดรายวัน
+    filteredTransactions.forEach(t => {
+      const d = new Date(t.created_at)
+      const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`
+      
+      if (!grouped[dateStr]) {
+        grouped[dateStr] = { 
+          dateStr, 
+          timestamp: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
+          ยอดรับเข้า: 0, 
+          ยอดเบิกจ่าย: 0 
+        }
+      }
+      
+      const amount = Number(t.amount) || 0
+      if (t.type === 'receive' || t.type === 'import') grouped[dateStr].ยอดรับเข้า += amount
+      else if (t.type === 'issue') grouped[dateStr].ยอดเบิกจ่าย += amount
+    })
+
+    return Object.values(grouped).sort((a, b) => a.timestamp - b.timestamp)
+  }, [filteredTransactions])
+
+  // 4. สัดส่วนกลุ่มสินค้า
   const breakdown = useMemo(() => {
-    const total = kpi.totalStock || 1 // กันหาร 0
+    const total = kpi.totalStock || 1
     const groups: Record<string, number> = {}
     products.forEach(p => {
       const prefix = p.prefix || 'OTHER'
@@ -79,7 +101,7 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
     return Object.entries(groups)
       .map(([prefix, count]) => ({ prefix, count, percent: Math.round((count / total) * 100) }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 4) // เอาแค่ 4 อันดับแรก
+      .slice(0, 4)
   }, [products, kpi.totalStock])
 
   const colors = ['bg-amber-500', 'bg-blue-500', 'bg-emerald-500', 'bg-purple-500']
@@ -138,7 +160,7 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
           </div>
           <div>
             <h3 className="text-3xl font-black text-slate-900">{kpi.totalStock.toLocaleString()}</h3>
-            <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block mt-2">รวมทุกหน่วยนับ</p>
+            <p className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded inline-block mt-2">ยอดสต๊อกคงเหลือปัจจุบัน</p>
           </div>
         </div>
 
@@ -182,7 +204,7 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
               <p className="text-sm font-bold text-emerald-100">สินค้าเบิกจ่ายสูงสุด</p>
               <div className="p-2 bg-emerald-600 text-white rounded-xl"><Award size={18}/></div>
             </div>
-            <h3 className="text-2xl font-black text-white leading-tight truncate">{kpi.topItem.name}</h3>
+            <h3 className="text-2xl font-black text-white leading-tight truncate" title={kpi.topItem.name}>{kpi.topItem.name}</h3>
             <p className="text-emerald-200 text-xs font-bold mt-1">กลุ่ม {kpi.topItem.prefix}</p>
             <p className="text-[10px] font-black text-emerald-900 bg-emerald-400 px-2 py-1 rounded inline-block mt-3 shadow-sm">เบิกออก {kpi.topItem.count.toLocaleString()} ครั้ง</p>
           </div>
@@ -191,12 +213,33 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
 
       {/* 3. Charts & Breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm lg:col-span-2 flex flex-col justify-center items-center text-slate-400">
-             {/* ซ่อนกราฟแท่งไว้ชั่วคราว รอต่อไลบรารีกราฟจริง */}
-             <TrendingUp size={48} className="mb-2 opacity-20" />
-             <p className="text-sm font-bold">พื้นที่สำหรับกราฟสรุปรายวัน</p>
+        
+        {/* กราฟแท่งรายวัน */}
+        <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm lg:col-span-2">
+          <div className="mb-6">
+            <h3 className="text-lg font-black text-slate-800">แนวโน้มความเคลื่อนไหว (Movement Trend)</h3>
+            <p className="text-xs font-bold text-slate-400">แสดงยอดรับเข้าและเบิกจ่าย แยกตามวัน</p>
+          </div>
+          <div className="h-72 w-full mt-4">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="dateStr" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#94a3b8' }} />
+                  <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '16px', border: '1px solid #f1f5f9', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.05)', fontWeight: 'bold' }} />
+                  <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#64748b', paddingTop: '20px' }} />
+                  <Bar dataKey="ยอดเบิกจ่าย" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                  <Bar dataKey="ยอดรับเข้า" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-300 font-bold text-sm">ไม่มีข้อมูลการเคลื่อนไหวในช่วงเวลานี้</div>
+            )}
+          </div>
         </div>
 
+        {/* สัดส่วนสต๊อก */}
         <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm h-full">
           <div className="mb-6">
             <h3 className="text-lg font-black text-slate-800">สัดส่วนสต๊อก (Stock Breakdown)</h3>
@@ -219,6 +262,57 @@ export default function ExecutiveReportTab({ transactions = [], products = [] }:
           </div>
         </div>
       </div>
+
+      {/* 4. ตารางรายละเอียดการเข้า-ออก */}
+      <div className="bg-white p-6 rounded-[2.5rem] border shadow-sm">
+        <div className="mb-6">
+          <h3 className="text-lg font-black text-slate-800">รายงานการเข้า-ออก (Transaction Logs)</h3>
+          <p className="text-xs font-bold text-slate-400">รายละเอียดสินค้าที่มีความเคลื่อนไหวตามช่วงเวลาที่กรอง</p>
+        </div>
+        <div className="overflow-x-auto max-h-[400px]">
+          <table className="w-full text-sm text-left whitespace-nowrap">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50 sticky top-0 z-10">
+              <tr>
+                <th className="px-4 py-3 rounded-tl-xl">วันที่ / เวลา</th>
+                <th className="px-4 py-3">ประเภท</th>
+                <th className="px-4 py-3">รหัส SKU</th>
+                <th className="px-4 py-3">ชื่อสินค้า</th>
+                <th className="px-4 py-3 text-right">จำนวน</th>
+                <th className="px-4 py-3 rounded-tr-xl">ผู้ทำรายการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTransactions.length > 0 ? (
+                filteredTransactions.map((t, idx) => (
+                  <tr key={idx} className="border-b border-slate-50 hover:bg-slate-50/50">
+                    <td className="px-4 py-3 text-slate-600 font-medium">
+                      {new Date(t.created_at).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      {t.type === 'issue' ? (
+                        <span className="bg-red-100 text-red-600 px-2 py-1 rounded text-[10px] font-black tracking-wide">เบิกออก</span>
+                      ) : (
+                        <span className="bg-emerald-100 text-emerald-600 px-2 py-1 rounded text-[10px] font-black tracking-wide">รับเข้า</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-slate-500 text-xs">{t.products?.sku_15_digits || '-'}</td>
+                    <td className="px-4 py-3 font-bold text-slate-700">{t.products?.name || '-'}</td>
+                    <td className="px-4 py-3 text-right font-black text-slate-900">{Number(t.amount).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs">{t.created_by || '-'}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-4 py-12 text-center text-slate-400 font-bold">
+                    ไม่มีรายการเคลื่อนไหวในช่วงเวลานี้
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   )
 }
