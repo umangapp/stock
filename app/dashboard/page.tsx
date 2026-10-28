@@ -344,7 +344,12 @@ export default function AdminDashboard() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto p-4 lg:p-10 pb-24">
         
-        {activeTab === 'executive' && <ExecutiveReportTab />}
+        {activeTab === 'executive' && (
+         <ExecutiveReportTab 
+          transactions={transactions} 
+          products={products} 
+         />
+      )}
 
         {activeTab === 'inventory' && (
           <InventoryTab 
